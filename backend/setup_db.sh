@@ -4,9 +4,9 @@
 
 set -e
 
-DB_NAME="rastarant"
-DB_USER="saifeer1019"
-DB_PASS="Terabyte88"
+DB_NAME="${DB_NAME:-rastarant_local}"
+DB_USER="${DB_USER:-rastarant_pos}"
+DB_PASS="${DB_PASS:-password}"
 
 echo ""
 echo "Setting up PostgreSQL for Rastarant..."
@@ -35,5 +35,7 @@ sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_US
 sudo -u postgres psql -d "${DB_NAME}" -c "GRANT ALL ON SCHEMA public TO ${DB_USER};"
 
 echo ""
-echo "✓ PostgreSQL ready! Run: bash start_ngrok.sh"
+echo "✓ Local PostgreSQL ready!"
+echo "  LOCAL_DATABASE_URL=postgresql+asyncpg://${DB_USER}:${DB_PASS}@localhost/${DB_NAME}"
+echo "  Run: bash start.sh"
 echo ""

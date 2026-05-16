@@ -29,7 +29,13 @@ def _item_to_dict(item: MenuItem) -> dict:
         "isAvailable": item.is_available,
         "imageUrl": item.image_url,
         "version": item.version,
+        "localId": item.local_id,
+        "remoteId": item.remote_id,
+        "syncStatus": item.sync_status,
+        "lastSyncError": item.last_sync_error,
+        "createdAt": item.created_at.isoformat(),
         "updatedAt": item.updated_at.isoformat(),
+        "syncedAt": item.synced_at.isoformat() if item.synced_at else None,
         "deletedAt": item.deleted_at.isoformat() if item.deleted_at else None,
     }
 
@@ -71,6 +77,7 @@ async def push_menu_item(
         is_available=body.isAvailable,
         image_url=body.imageUrl,
         version=body.version,
+        created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )
     db.add(item)
@@ -102,6 +109,8 @@ async def update_menu_item(
     item.image_url = body.imageUrl
     item.version = body.version
     item.updated_at = datetime.now(timezone.utc)
+    item.sync_status = "pending"
+    item.synced_at = None
     await db.commit()
     await db.refresh(item)
 
@@ -123,6 +132,8 @@ async def delete_menu_item(
 
     item.deleted_at = datetime.now(timezone.utc)
     item.updated_at = datetime.now(timezone.utc)
+    item.sync_status = "pending"
+    item.synced_at = None
     await db.commit()
 
     await manager.broadcast(outlet_id, {"type": "menu_updated", "data": _item_to_dict(item)})
@@ -193,6 +204,8 @@ async def upload_outlet_image(
     public_url = f"{settings.BASE_URL}/uploads/outlet_images/{filename}"
     gallery.append(public_url)
     outlet.gallery_images = gallery
+    outlet.sync_status = "pending"
+    outlet.synced_at = None
     await db.commit()
     return ok({"publicUrl": public_url, "galleryImages": gallery})
 
@@ -214,6 +227,8 @@ async def delete_outlet_image(
 
     gallery.pop(index)
     outlet.gallery_images = gallery
+    outlet.sync_status = "pending"
+    outlet.synced_at = None
     await db.commit()
     return ok({"galleryImages": gallery})
 
@@ -245,6 +260,8 @@ async def upload_outlet_video(
 
     public_url = f"{settings.BASE_URL}/uploads/outlet_videos/{filename}"
     outlet.video_url = public_url
+    outlet.sync_status = "pending"
+    outlet.synced_at = None
     await db.commit()
     return ok({"videoUrl": public_url})
 
@@ -261,5 +278,7 @@ async def update_outlet_media(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Outlet not found.")
 
     outlet.video_url = body.videoUrl
+    outlet.sync_status = "pending"
+    outlet.synced_at = None
     await db.commit()
     return ok({"videoUrl": outlet.video_url})

@@ -27,14 +27,14 @@ class _QrPdfScreenState extends State<QrPdfScreen> {
     super.didChangeDependencies();
     if (_urlCtrl.text.isEmpty) {
       final app = AppScope.of(context);
-      final baseUrl = app.cloudConfig.baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
-      final outletId = app.serverConfig.outletId.trim();
-      if (baseUrl.isNotEmpty && outletId.isNotEmpty) {
-        _urlCtrl.text = '$baseUrl/menu/$outletId';
-      } else if (baseUrl.isNotEmpty) {
-        _urlCtrl.text = '$baseUrl/menu/$outletId';
+      final baseUrl = app.cloudConfig.baseUrl.trim().replaceAll(
+        RegExp(r'/+$'),
+        '',
+      );
+      if (baseUrl.isNotEmpty) {
+        _urlCtrl.text = '$baseUrl/menu';
       } else {
-        _urlCtrl.text = 'https://kiwi-equator-banknote.ngrok-free.app/menu/$outletId';
+        _urlCtrl.text = 'http://LOCAL_SERVER_IP:8000/menu';
       }
     }
   }
@@ -145,7 +145,9 @@ class _QrPdfScreenState extends State<QrPdfScreen> {
             ),
             child: pw.Center(
               child: pw.Text(
-                restaurantName.isNotEmpty ? restaurantName[0].toUpperCase() : 'R',
+                restaurantName.isNotEmpty
+                    ? restaurantName[0].toUpperCase()
+                    : 'R',
                 style: pw.TextStyle(
                   fontSize: 28,
                   fontWeight: pw.FontWeight.bold,
@@ -174,7 +176,10 @@ class _QrPdfScreenState extends State<QrPdfScreen> {
           ],
           pw.SizedBox(height: 24),
           pw.Container(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const pw.EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 10,
+            ),
             decoration: pw.BoxDecoration(
               color: bg,
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
@@ -198,16 +203,18 @@ class _QrPdfScreenState extends State<QrPdfScreen> {
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(12)),
               border: pw.Border.all(color: line, width: 1.5),
             ),
-            child: pw.Image(qrImage, width: 200, height: 200, fit: pw.BoxFit.contain),
+            child: pw.Image(
+              qrImage,
+              width: 200,
+              height: 200,
+              fit: pw.BoxFit.contain,
+            ),
           ),
           pw.SizedBox(height: 16),
           pw.Text(
             url,
             textAlign: pw.TextAlign.center,
-            style: pw.TextStyle(
-              fontSize: 8,
-              color: subtle,
-            ),
+            style: pw.TextStyle(fontSize: 8, color: subtle),
           ),
         ],
       ),
@@ -285,9 +292,7 @@ class _QrPdfScreenState extends State<QrPdfScreen> {
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                _qrUrl.isEmpty
-                                    ? text.orderingUrlHint
-                                    : _qrUrl,
+                                _qrUrl.isEmpty ? text.orderingUrlHint : _qrUrl,
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w700,
@@ -304,7 +309,10 @@ class _QrPdfScreenState extends State<QrPdfScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              _PreviewCard(),
+              AnimatedBuilder(
+                animation: _urlCtrl,
+                builder: (context, _) => _PreviewCard(url: _qrUrl),
+              ),
               const SizedBox(height: 28),
               SizedBox(
                 width: double.infinity,
@@ -350,7 +358,10 @@ class _InfoBanner extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [PosColors.primarySoft, PosColors.accentSoft.withValues(alpha: 0.4)],
+          colors: [
+            PosColors.primarySoft,
+            PosColors.accentSoft.withValues(alpha: 0.4),
+          ],
         ),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: PosColors.line),
@@ -363,7 +374,11 @@ class _InfoBanner extends StatelessWidget {
               gradient: PosGradients.brand,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.qr_code_2_rounded, color: PosColors.slate, size: 22),
+            child: Icon(
+              Icons.qr_code_2_rounded,
+              color: PosColors.slate,
+              size: 22,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -398,6 +413,10 @@ class _InfoBanner extends StatelessWidget {
 }
 
 class _PreviewCard extends StatelessWidget {
+  const _PreviewCard({required this.url});
+
+  final String url;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -410,11 +429,12 @@ class _PreviewCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 70,
+            width: 88,
+            height: 88,
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(color: PosColors.line),
               boxShadow: [
                 BoxShadow(
@@ -424,13 +444,28 @@ class _PreviewCard extends StatelessWidget {
                 ),
               ],
             ),
-            child: Center(
-              child: Icon(
-                Icons.qr_code_2_rounded,
-                size: 32,
-                color: PosColors.primary,
-              ),
-            ),
+            child: url.isEmpty
+                ? Center(
+                    child: Icon(
+                      Icons.qr_code_2_rounded,
+                      size: 32,
+                      color: PosColors.primary,
+                    ),
+                  )
+                : QrImageView(
+                    data: url,
+                    version: QrVersions.auto,
+                    gapless: true,
+                    backgroundColor: Colors.white,
+                    eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: ui.Color(0xFF1A1A2E),
+                    ),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: ui.Color(0xFF1A1A2E),
+                    ),
+                  ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -438,7 +473,7 @@ class _PreviewCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Single A4 print-ready card',
+                  'LAN menu QR',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
@@ -447,7 +482,7 @@ class _PreviewCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '1 QR code → 1 PDF page',
+                  'Customers on the same WiFi router can scan and open the menu.',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -456,10 +491,12 @@ class _PreviewCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Display at entrance, counter, or tables',
+                  url.isEmpty ? 'http://LOCAL_SERVER_IP:8000/menu' : url,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     color: PosColors.muted,
                   ),
                 ),

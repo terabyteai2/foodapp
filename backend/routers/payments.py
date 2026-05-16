@@ -19,7 +19,13 @@ def _session_dict(s: BkashSession) -> dict:
         "currency": s.currency,
         "purpose": s.purpose,
         "status": s.status,
+        "localId": s.local_id,
+        "remoteId": s.remote_id,
+        "syncStatus": s.sync_status,
+        "lastSyncError": s.last_sync_error,
         "createdAt": s.created_at.isoformat(),
+        "updatedAt": s.updated_at.isoformat(),
+        "syncedAt": s.synced_at.isoformat() if s.synced_at else None,
     }
 
 
@@ -45,6 +51,8 @@ async def verify_bkash_payment(payment_id: str, db: AsyncSession = Depends(get_d
     if session is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found.")
     session.status = "verified"
+    session.sync_status = "pending"
+    session.synced_at = None
     await db.commit()
     await db.refresh(session)
     return ok(_session_dict(session))

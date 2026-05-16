@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import get_current_outlet_id
 from database import get_db
-from models import Order
+from models import Order, OrderItem
 from routers.ws import manager
 from schemas import OrderPayload, OrderStatusUpdate, ok
 
@@ -23,9 +23,39 @@ def _order_to_dict(order: Order) -> dict:
         "totalAmount": float(order.total_amount),
         "items": order.items,
         "notes": order.notes,
+        "tableNo": order.table_no,
+        "paymentStatus": order.payment_status,
+        "localId": order.local_id,
+        "remoteId": order.remote_id,
+        "syncStatus": order.sync_status,
+        "lastSyncError": order.last_sync_error,
         "createdAt": order.created_at.isoformat(),
         "updatedAt": order.updated_at.isoformat(),
+        "syncedAt": order.synced_at.isoformat() if order.synced_at else None,
     }
+
+
+def _order_items(order_id: str, outlet_id: str, items: list) -> list[OrderItem]:
+    rows: list[OrderItem] = []
+    for raw in items:
+        if not isinstance(raw, dict):
+            continue
+        qty = int(raw.get("qty") or raw.get("quantity") or 1)
+        price = float(raw.get("price") or 0)
+        rows.append(
+            OrderItem(
+                order_id=order_id,
+                outlet_id=outlet_id,
+                menu_item_id=str(
+                    raw.get("menuItemId") or raw.get("menu_item_id") or raw.get("id") or ""
+                ),
+                name=str(raw.get("name") or "Item"),
+                qty=qty,
+                price=price,
+                line_total=float(raw.get("lineTotal") or raw.get("line_total") or price * qty),
+            )
+        )
+    return rows
 
 
 @router.get("/outlets/{outlet_id}/orders")
@@ -69,6 +99,8 @@ async def push_order(
         updated_at=now,
     )
     db.add(order)
+    for item in _order_items(order.id, outlet_id, body.items):
+        db.add(item)
     await db.commit()
     await db.refresh(order)
 
@@ -91,6 +123,8 @@ async def update_order_status(
 
     order.status = body.status
     order.updated_at = datetime.now(timezone.utc)
+    order.sync_status = "pending"
+    order.synced_at = None
     await db.commit()
     await db.refresh(order)
 

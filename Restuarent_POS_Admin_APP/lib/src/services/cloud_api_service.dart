@@ -39,7 +39,8 @@ class CloudRealtimeConfig {
   // For Supabase realtime: needs supabaseUrl + publishableKey
   // For Python backend: just needs restBaseUrl (enabled can be false)
   bool get canConnect {
-    final hasSupabase = enabled &&
+    final hasSupabase =
+        enabled &&
         supabaseUrl.trim().isNotEmpty &&
         publishableKey.trim().isNotEmpty &&
         channelPrefix.trim().isNotEmpty;
@@ -309,6 +310,14 @@ class CloudApiService {
     );
   }
 
+  Future<Map<String, Object?>> syncBackendNow() async {
+    final uri = _uri('/sync/now');
+    if (uri == null) {
+      throw CloudApiException('Cloud API URL is empty or invalid.');
+    }
+    return _sendJson('POST', uri);
+  }
+
   Future<Map<String, Object?>> pushMenuItem(MenuItem item) async {
     final config = _requireServerConfig();
     final uri = _uri('/outlets/${config.outletId}/menu');
@@ -366,7 +375,9 @@ class CloudApiService {
   Future<List<String>> uploadOutletImage(String dataUrl) async {
     final config = _requireServerConfig();
     final uri = _uri('/outlets/${config.outletId}/images');
-    if (uri == null) throw CloudApiException('Cloud API URL is empty or invalid.');
+    if (uri == null) {
+      throw CloudApiException('Cloud API URL is empty or invalid.');
+    }
     final response = await _sendJson(
       'POST',
       uri,
@@ -386,7 +397,9 @@ class CloudApiService {
   Future<List<String>> deleteOutletImage(int index) async {
     final config = _requireServerConfig();
     final uri = _uri('/outlets/${config.outletId}/images/$index');
-    if (uri == null) throw CloudApiException('Cloud API URL is empty or invalid.');
+    if (uri == null) {
+      throw CloudApiException('Cloud API URL is empty or invalid.');
+    }
     final response = await _sendJson('DELETE', uri);
     final data = response['data'] is Map
         ? Map<String, Object?>.from(response['data'] as Map)
@@ -399,28 +412,40 @@ class CloudApiService {
   Future<void> updateOutletMedia({String? videoUrl}) async {
     final config = _requireServerConfig();
     final uri = _uri('/outlets/${config.outletId}/media');
-    if (uri == null) throw CloudApiException('Cloud API URL is empty or invalid.');
+    if (uri == null) {
+      throw CloudApiException('Cloud API URL is empty or invalid.');
+    }
     await _sendJson('PATCH', uri, body: {'videoUrl': videoUrl});
   }
 
   Future<String> uploadOutletVideo(List<int> bytes, String filename) async {
     final config = _requireServerConfig();
     final uri = _uri('/outlets/${config.outletId}/video');
-    if (uri == null) throw CloudApiException('Cloud API URL is empty or invalid.');
+    if (uri == null) {
+      throw CloudApiException('Cloud API URL is empty or invalid.');
+    }
 
     final request = http.MultipartRequest('POST', uri)
       ..headers['Authorization'] = 'Bearer ${_cloudConfig.deviceToken.trim()}'
-      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+      ..files.add(
+        http.MultipartFile.fromBytes('file', bytes, filename: filename),
+      );
 
     final streamed = await request.send().timeout(const Duration(seconds: 120));
     final body = await streamed.stream.bytesToString();
     if (streamed.statusCode < 200 || streamed.statusCode >= 300) {
-      throw CloudApiException('Video upload failed: HTTP ${streamed.statusCode}');
+      throw CloudApiException(
+        'Video upload failed: HTTP ${streamed.statusCode}',
+      );
     }
     final decoded = jsonDecode(body);
-    final data = decoded['data'] is Map ? Map<String, Object?>.from(decoded['data'] as Map) : <String, Object?>{};
+    final data = decoded['data'] is Map
+        ? Map<String, Object?>.from(decoded['data'] as Map)
+        : <String, Object?>{};
     final url = data['videoUrl']?.toString().trim() ?? '';
-    if (url.isEmpty) throw CloudApiException('Server did not return a video URL.');
+    if (url.isEmpty) {
+      throw CloudApiException('Server did not return a video URL.');
+    }
     return url;
   }
 
@@ -601,4 +626,3 @@ class CloudApiService {
     _client.close();
   }
 }
-

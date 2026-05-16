@@ -12,6 +12,10 @@ fi
 
 echo "Starting Rastarant API server (local)..."
 echo "URL: http://localhost:8000"
+LAN_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+if [ -n "$LAN_IP" ]; then
+  echo "LAN menu QR: http://$LAN_IP:8000/menu"
+fi
 echo "Docs: http://localhost:8000/docs"
 echo ""
 

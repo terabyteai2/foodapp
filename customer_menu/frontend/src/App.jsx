@@ -147,7 +147,7 @@ function getOutletId() {
   const parts = window.location.pathname.split('/').filter(Boolean)
   const idx = parts.indexOf('menu')
   if (idx !== -1 && parts[idx + 1]) return parts[idx + 1]
-  return parts[parts.length - 1] || null
+  return null
 }
 
 function cartTotal(cart, items) {
@@ -179,7 +179,8 @@ function GoldLine() {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  const outletId = getOutletId()
+  const urlOutletId = getOutletId()
+  const [outletId, setOutletId] = useState(urlOutletId)
   const [phase, setPhase]       = useState('loading')
   const [info, setInfo]         = useState(null)
   const [items, setItems]       = useState([])
@@ -193,17 +194,31 @@ export default function App() {
   const [lastCart, setLastCart] = useState([])
 
   useEffect(() => {
-    if (!outletId) { setPhase('error'); setErr('Invalid menu link.'); return }
-    Promise.all([
-      fetch(`${API_BASE}/customer/${outletId}/info`).then(r => r.json()),
-      fetch(`${API_BASE}/customer/${outletId}/menu`).then(r => r.json()),
-    ]).then(([infoRes, menuRes]) => {
+    async function loadMenu() {
+      try {
+        setPhase('loading')
+        let activeOutletId = urlOutletId
+        let infoRes
+        if (!activeOutletId) {
+          infoRes = await fetch(`${API_BASE}/customer/default`).then(r => r.json())
+          if (!infoRes.ok) throw new Error('Could not load restaurant')
+          activeOutletId = infoRes.data.outletId
+          setOutletId(activeOutletId)
+        } else {
+          infoRes = await fetch(`${API_BASE}/customer/${activeOutletId}/info`).then(r => r.json())
+        }
+        const menuRes = await fetch(`${API_BASE}/customer/${activeOutletId}/menu`).then(r => r.json())
       if (!infoRes.ok || !menuRes.ok) throw new Error('Could not load menu')
       setInfo(infoRes.data)
       setItems(menuRes.data)
       setPhase('menu')
-    }).catch(e => { setPhase('error'); setErr(e.message || 'Could not load menu.') })
-  }, [outletId])
+      } catch (e) {
+        setPhase('error')
+        setErr(e.message || 'Could not load menu.')
+      }
+    }
+    loadMenu()
+  }, [urlOutletId])
 
   const categories = ['All', ...new Set(items.map(i => i.category).filter(Boolean))]
   const visible = activeCategory === 'All' ? items : items.filter(i => i.category === activeCategory)

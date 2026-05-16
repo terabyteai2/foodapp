@@ -243,6 +243,7 @@ class SyncService {
       if (pulled > 0) {
         _addLog('Imported $pulled cloud update${pulled == 1 ? '' : 's'}.');
       }
+      await _triggerBackendSync();
       await refreshSummary();
       _state = _state.copyWith(
         isSyncing: false,
@@ -363,6 +364,30 @@ class SyncService {
     return imported;
   }
 
+  Future<void> _triggerBackendSync() async {
+    try {
+      final response = await _cloudApi.syncBackendNow();
+      final data = response['data'] is Map
+          ? Map<String, Object?>.from(response['data'] as Map)
+          : response;
+      final pushed = data['pushed'];
+      final failed = data['failed'];
+      if (pushed is int && pushed > 0) {
+        _addLog(
+          'Backend pushed $pushed local record${pushed == 1 ? '' : 's'} to Supabase.',
+        );
+      }
+      if (failed is int && failed > 0) {
+        _addLog(
+          'Backend Supabase sync has $failed failed record${failed == 1 ? '' : 's'}.',
+          isError: true,
+        );
+      }
+    } catch (error) {
+      _addLog('Backend Supabase sync trigger skipped: $error', isError: true);
+    }
+  }
+
   Future<void> _connectCloudRealtime() async {
     var realtimeConfig = await _cloudApi.loadRealtimeConfig();
     // If backend returned enabled:false (Python backend), build a native-WS config
@@ -457,9 +482,13 @@ class SyncService {
     final now = DateTime.now().toIso8601String();
     final normalized = Map<String, Object?>.from(payload);
     // Field name normalisations: backend uses different names than the Flutter model
-    normalized['total'] ??= normalized['totalAmount']; // backend sends totalAmount
-    normalized['total'] ??= items.fold<double>(0, (t, item) => t + item.lineTotal);
-    normalized['note'] ??= normalized['notes'];         // backend sends notes
+    normalized['total'] ??=
+        normalized['totalAmount']; // backend sends totalAmount
+    normalized['total'] ??= items.fold<double>(
+      0,
+      (t, item) => t + item.lineTotal,
+    );
+    normalized['note'] ??= normalized['notes']; // backend sends notes
     // Map serialNumber → sequenceNo and build a human-readable orderNo
     final serial = normalized['serialNumber'];
     normalized['sequenceNo'] ??= serial;

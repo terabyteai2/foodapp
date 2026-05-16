@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from database import get_db
-from models import MenuItem, Order, Outlet, Restaurant
+from models import MenuItem, Order, OrderItem, Outlet
 from routers.ws import manager
 
 router = APIRouter(prefix="/customer", tags=["customer"])
@@ -42,6 +42,31 @@ async def _get_outlet(outlet_id: str, db: AsyncSession) -> Outlet:
     if outlet is None:
         raise HTTPException(status_code=404, detail="Outlet not found")
     return outlet
+
+
+def _outlet_info(outlet: Outlet) -> dict:
+    return {
+        "outletId": outlet.id,
+        "restaurantName": outlet.restaurant.name if outlet.restaurant else "",
+        "outletName": outlet.name,
+        "bannerUrl": outlet.banner_url,
+        "videoUrl": outlet.video_url,
+        "galleryImages": outlet.gallery_images or [],
+    }
+
+
+@router.get("/default")
+async def get_default_outlet(db: AsyncSession = Depends(get_db)):
+    outlet = (
+        await db.execute(
+            select(Outlet)
+            .options(joinedload(Outlet.restaurant))
+            .order_by(Outlet.created_at.asc())
+        )
+    ).scalars().first()
+    if outlet is None:
+        raise HTTPException(status_code=404, detail="No outlet found")
+    return _ok(_outlet_info(outlet))
 
 
 # ── GET menu ──────────────────────────────────────────────────────────────────
@@ -117,10 +142,23 @@ async def place_customer_order(
         total_amount=round(total, 2),
         items=items_payload,
         notes=body.tableNo and f"Table {body.tableNo}" or body.note,
+        table_no=body.tableNo,
         created_at=now,
         updated_at=now,
     )
     db.add(order)
+    for item in items_payload:
+        db.add(
+            OrderItem(
+                order_id=order_id,
+                outlet_id=outlet_id,
+                menu_item_id=item["menuItemId"],
+                name=item["name"],
+                qty=item["qty"],
+                price=item["price"],
+                line_total=item["lineTotal"],
+            )
+        )
     await db.commit()
     await db.refresh(order)
 
@@ -145,8 +183,14 @@ async def place_customer_order(
                 "totalAmount": float(order.total_amount),
                 "items": order.items,
                 "notes": order.notes,
+                "tableNo": order.table_no,
+                "paymentStatus": order.payment_status,
+                "localId": order.local_id,
+                "remoteId": order.remote_id,
+                "syncStatus": order.sync_status,
                 "createdAt": order.created_at.isoformat(),
                 "updatedAt": order.updated_at.isoformat(),
+                "syncedAt": order.synced_at.isoformat() if order.synced_at else None,
             },
         },
     )
@@ -178,11 +222,4 @@ async def get_outlet_info(
     ).scalar_one_or_none()
     if outlet is None:
         raise HTTPException(status_code=404, detail="Outlet not found")
-    return _ok({
-        "outletId": outlet.id,
-        "restaurantName": outlet.restaurant.name if outlet.restaurant else "",
-        "outletName": outlet.name,
-        "bannerUrl": outlet.banner_url,
-        "videoUrl": outlet.video_url,
-        "galleryImages": outlet.gallery_images or [],
-    })
+    return _ok(_outlet_info(outlet))
