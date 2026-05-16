@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "531957308412",
+    "project_id": "pos-restaurent-terabyte-ai",
+    "storage_bucket": "pos-restaurent-terabyte-ai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:531957308412:android:8aa49b5926cafb129e7079",
+        "android_client_info": {
+          "package_name": "com.terabyteAI.Res.Admin"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "531957308412-q23cksrmcveh8afjvtes6e50pdpfjg8v.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.terabyteAI.Res.Admin",
+            "certificate_hash": "1a7f22880315da162a700d5e2d57701bb3f77264"
+          }
+        },
+        {
+          "client_id": "531957308412-t89tfbqq1rbhohrmf1amlj04qf19rnet.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.terabyteAI.Res.Admin",
+            "certificate_hash": "a244fbfa5086c00cffd140dd87c298847879c520"
+          }
+        },
+        {
+          "client_id": "531957308412-2lgpspvuj7f3jims5uisfvevau7ocali.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBH_yKmUS6T0p-c_wKV1IAbMMZv1yVZvlo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "531957308412-2lgpspvuj7f3jims5uisfvevau7ocali.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

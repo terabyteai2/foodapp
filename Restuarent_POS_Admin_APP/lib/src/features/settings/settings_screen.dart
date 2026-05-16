@@ -2181,20 +2181,34 @@ class _HeroMediaPageState extends State<_HeroMediaPage> {
   }
 
   Future<void> _fetchInfo() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final uri = Uri.parse('${widget.baseUrl.trimRight()}/customer/${widget.outletId}/info');
+      final uri = Uri.parse(
+        '${widget.baseUrl.trimRight()}/customer/${widget.outletId}/info',
+      );
       final res = await http.get(uri).timeout(const Duration(seconds: 10));
       final data = jsonDecode(res.body);
-      final info = data['data'] is Map ? Map<String, dynamic>.from(data['data'] as Map) : <String, dynamic>{};
+      final info = data['data'] is Map
+          ? Map<String, dynamic>.from(data['data'] as Map)
+          : <String, dynamic>{};
       final rawGallery = info['galleryImages'];
       setState(() {
-        _gallery = rawGallery is List ? rawGallery.map((e) => e.toString()).toList() : [];
-        _currentVideoUrl = info['videoUrl']?.toString().trim().isEmpty == true ? null : info['videoUrl']?.toString().trim();
+        _gallery = rawGallery is List
+            ? rawGallery.map((e) => e.toString()).toList()
+            : [];
+        _currentVideoUrl = info['videoUrl']?.toString().trim().isEmpty == true
+            ? null
+            : info['videoUrl']?.toString().trim();
         _loading = false;
       });
     } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
     }
   }
 
@@ -2209,16 +2223,25 @@ class _HeroMediaPageState extends State<_HeroMediaPage> {
       final dataUrl = await _imageService.pickMenuImageDataUrl();
       if (dataUrl == null) return;
       setState(() => _saving = true);
-      final updated = await widget.cloudApiService.uploadOutletImage(dataUrl) as List<String>;
-      setState(() { _gallery = updated; _saving = false; });
+      final updated =
+          await widget.cloudApiService.uploadOutletImage(dataUrl)
+              as List<String>;
+      setState(() {
+        _gallery = updated;
+        _saving = false;
+      });
     } on MenuImageException catch (e) {
       setState(() => _saving = false);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       setState(() => _saving = false);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -2228,20 +2251,32 @@ class _HeroMediaPageState extends State<_HeroMediaPage> {
       builder: (_) => AlertDialog(
         title: const Text('Remove image?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Remove')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
         ],
       ),
     );
     if (confirmed != true) return;
     try {
       setState(() => _saving = true);
-      final updated = await widget.cloudApiService.deleteOutletImage(index) as List<String>;
-      setState(() { _gallery = updated; _saving = false; });
+      final updated =
+          await widget.cloudApiService.deleteOutletImage(index) as List<String>;
+      setState(() {
+        _gallery = updated;
+        _saving = false;
+      });
     } catch (e) {
       setState(() => _saving = false);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -2257,21 +2292,32 @@ class _HeroMediaPageState extends State<_HeroMediaPage> {
     if (bytes.length > maxBytes) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Video is too large. Please use a clip under 50 MB.')),
+        const SnackBar(
+          content: Text('Video is too large. Please use a clip under 50 MB.'),
+        ),
       );
       return;
     }
 
     setState(() => _saving = true);
     try {
-      final url = await widget.cloudApiService.uploadOutletVideo(bytes, video.name) as String;
-      setState(() { _currentVideoUrl = url; _saving = false; });
+      final url =
+          await widget.cloudApiService.uploadOutletVideo(bytes, video.name)
+              as String;
+      setState(() {
+        _currentVideoUrl = url;
+        _saving = false;
+      });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Video uploaded!')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Video uploaded!')));
     } catch (e) {
       setState(() => _saving = false);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -2279,145 +2325,200 @@ class _HeroMediaPageState extends State<_HeroMediaPage> {
     setState(() => _saving = true);
     try {
       await widget.cloudApiService.updateOutletMedia(videoUrl: null);
-      setState(() { _currentVideoUrl = null; _saving = false; });
+      setState(() {
+        _currentVideoUrl = null;
+        _saving = false;
+      });
     } catch (e) {
       setState(() => _saving = false);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Hero Media'),
-        centerTitle: false,
-      ),
+      appBar: AppBar(title: const Text('Hero Media'), centerTitle: false),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(_error!, textAlign: TextAlign.center),
-                    SizedBox(height: 12),
-                    FilledButton(onPressed: _fetchInfo, child: const Text('Retry')),
-                  ],
-                ))
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Hero Photos', style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Up to 5 photos shown as a carousel when no video is set.',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        height: 110,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
-                            ..._gallery.asMap().entries.map((e) => Padding(
-                              padding: const EdgeInsets.only(right: 10),
-                              child: Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Image.network(
-                                      e.value,
-                                      width: 110,
-                                      height: 110,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => Container(
-                                        width: 110, height: 110,
-                                        color: Colors.grey.shade200,
-                                        child: const Icon(Icons.broken_image_outlined),
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_error!, textAlign: TextAlign.center),
+                  SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: _fetchInfo,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hero Photos',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Up to 5 photos shown as a carousel when no video is set.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    height: 110,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        ..._gallery.asMap().entries.map(
+                          (e) => Padding(
+                            padding: const EdgeInsets.only(right: 10),
+                            child: Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    e.value,
+                                    width: 110,
+                                    height: 110,
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            Container(
+                                              width: 110,
+                                              height: 110,
+                                              color: Colors.grey.shade200,
+                                              child: const Icon(
+                                                Icons.broken_image_outlined,
+                                              ),
+                                            ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: GestureDetector(
+                                    onTap: _saving
+                                        ? null
+                                        : () => _deleteImage(e.key),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black54,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        color: Colors.white,
+                                        size: 16,
                                       ),
                                     ),
                                   ),
-                                  Positioned(
-                                    top: 4, right: 4,
-                                    child: GestureDetector(
-                                      onTap: _saving ? null : () => _deleteImage(e.key),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: Colors.black54,
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: const Icon(Icons.close, color: Colors.white, size: 16),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )),
-                            if (_gallery.length < 5)
-                              GestureDetector(
-                                onTap: _saving ? null : _addImage,
-                                child: Container(
-                                  width: 110, height: 110,
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: Theme.of(context).colorScheme.outlineVariant,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  child: _saving
-                                      ? const Center(child: CircularProgressIndicator())
-                                      : const Icon(Icons.add_photo_alternate_outlined, size: 32),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (_gallery.length < 5)
+                          GestureDetector(
+                            onTap: _saving ? null : _addImage,
+                            child: Container(
+                              width: 110,
+                              height: 110,
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.outlineVariant,
+                                  width: 1.5,
                                 ),
                               ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-                      Text('Hero Video', style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Pick a short clip (up to 30 s, 50 MB). Takes priority over photos.',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 14),
-                      if (_currentVideoUrl != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(12),
+                              child: _saving
+                                  ? const Center(
+                                      child: CircularProgressIndicator(),
+                                    )
+                                  : const Icon(
+                                      Icons.add_photo_alternate_outlined,
+                                      size: 32,
+                                    ),
+                            ),
                           ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.videocam_rounded),
-                              const SizedBox(width: 10),
-                              const Expanded(child: Text('Video set', style: TextStyle(fontWeight: FontWeight.w600))),
-                              OutlinedButton.icon(
-                                onPressed: _saving ? null : _clearVideo,
-                                icon: const Icon(Icons.delete_outline, size: 18),
-                                label: const Text('Remove'),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
                       ],
-                      FilledButton.icon(
-                        onPressed: _saving ? null : _pickAndUploadVideo,
-                        icon: _saving
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.video_library_outlined),
-                        label: Text(_currentVideoUrl != null ? 'Replace Video' : 'Pick Video from Gallery'),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 28),
+                  Text(
+                    'Hero Video',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Pick a short clip (up to 30 s, 50 MB). Takes priority over photos.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 14),
+                  if (_currentVideoUrl != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.videocam_rounded),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Video set',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: _saving ? null : _clearVideo,
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            label: const Text('Remove'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  FilledButton.icon(
+                    onPressed: _saving ? null : _pickAndUploadVideo,
+                    icon: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.video_library_outlined),
+                    label: Text(
+                      _currentVideoUrl != null
+                          ? 'Replace Video'
+                          : 'Pick Video from Gallery',
+                    ),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }

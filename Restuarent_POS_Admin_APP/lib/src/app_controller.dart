@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../firebase_options.dart';
 import 'core/constants/cloud_defaults.dart';
 import 'core/constants/payment_defaults.dart';
 import 'core/localization/app_strings.dart';
@@ -71,9 +74,11 @@ class PosAppController extends ChangeNotifier {
   late final SyncService syncService;
 
   final Uuid _uuid = Uuid();
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   final List<StreamSubscription<Object?>> _subscriptions = [];
   final Set<String> _knownOrderIds = <String>{};
   final Set<String> _autoPrintInFlight = <String>{};
+  Future<void>? _googleSignInInit;
 
   bool initialized = false;
   bool busy = false;
@@ -199,10 +204,16 @@ class PosAppController extends ChangeNotifier {
         deviceToken: preferences.getString(_deviceTokenKey) ?? '',
         autoSyncIntervalSeconds: preferences.getInt(_autoSyncIntervalKey) ?? 30,
       );
-      accountEmail = preferences.getString(_accountEmailKey) ?? '';
-      accountUsername = preferences.getString(_accountUsernameKey) ?? '';
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      accountEmail =
+          firebaseUser?.email ?? preferences.getString(_accountEmailKey) ?? '';
+      accountUsername =
+          firebaseUser?.displayName ??
+          preferences.getString(_accountUsernameKey) ??
+          '';
       _accountPassword = preferences.getString(_accountPasswordKey) ?? '';
-      isLoggedIn = preferences.getBool(_accountLoggedInKey) ?? isTenantReady;
+      isLoggedIn =
+          preferences.getBool(_accountLoggedInKey) ?? firebaseUser != null;
 
       await printerService.initialize();
       printerState = printerService.state;
@@ -373,8 +384,13 @@ class PosAppController extends ChangeNotifier {
       inventoryItems.where((i) => i.isLowStock || i.isOutOfStock).length;
 
   List<String> get inventoryCategories {
-    final cats = inventoryItems.map((i) => i.category).where((c) => c.isNotEmpty).toSet().toList()
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final cats =
+        inventoryItems
+            .map((i) => i.category)
+            .where((c) => c.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     return cats;
   }
 
@@ -491,6 +507,51 @@ class PosAppController extends ChangeNotifier {
     });
   }
 
+  Future<bool> signInWithGoogle() async {
+    return _runBusy(() async {
+      await _ensureGoogleSignInInitialized();
+      if (kIsWeb && !_googleSignIn.supportsAuthenticate()) {
+        final provider = GoogleAuthProvider()
+          ..addScope('email')
+          ..addScope('profile');
+        final userCredential = await FirebaseAuth.instance.signInWithPopup(
+          provider,
+        );
+        final user = userCredential.user;
+        if (user == null) {
+          throw Exception('Google sign-in did not return a Firebase user.');
+        }
+        accountEmail = user.email ?? '';
+        accountUsername = _resolveFirebaseAccountName(user);
+        _accountPassword = '';
+        isLoggedIn = true;
+        await _persistAccountAuth();
+        return;
+      }
+
+      final googleAccount = await _googleSignIn.authenticate(
+        scopeHint: ['email', 'profile'],
+      );
+      final googleAuth = googleAccount.authentication;
+      if (googleAuth.idToken == null || googleAuth.idToken!.isEmpty) {
+        throw Exception('Google sign-in did not return an ID token.');
+      }
+
+      final credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+      );
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+      final user = userCredential.user;
+      accountEmail = user?.email ?? googleAccount.email;
+      accountUsername = _resolveGoogleAccountName(user, googleAccount);
+      _accountPassword = '';
+      isLoggedIn = true;
+      await _persistAccountAuth();
+    });
+  }
+
   Future<void> _loginCloudAccount({
     required String usernameOrEmail,
     required String password,
@@ -548,6 +609,13 @@ class PosAppController extends ChangeNotifier {
   Future<void> logOut() async {
     isLoggedIn = false;
     lastError = null;
+    await FirebaseAuth.instance.signOut();
+    try {
+      await _ensureGoogleSignInInitialized();
+      await _googleSignIn.signOut();
+    } on Object {
+      // Firebase sign-out above is enough to protect the app session.
+    }
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool(_accountLoggedInKey, false);
     notifyListeners();
@@ -845,6 +913,36 @@ class PosAppController extends ChangeNotifier {
     cloudApiService.close();
     unawaited(database.close());
     super.dispose();
+  }
+
+  Future<void> _ensureGoogleSignInInitialized() {
+    return _googleSignInInit ??= _googleSignIn.initialize(
+      clientId: kIsWeb ? DefaultFirebaseOptions.webClientId : null,
+      serverClientId: DefaultFirebaseOptions.webClientId,
+    );
+  }
+
+  String _resolveGoogleAccountName(
+    User? firebaseUser,
+    GoogleSignInAccount googleAccount,
+  ) {
+    final displayName = firebaseUser?.displayName ?? googleAccount.displayName;
+    if (displayName != null && displayName.trim().isNotEmpty) {
+      return displayName.trim();
+    }
+    final email = firebaseUser?.email ?? googleAccount.email;
+    final localPart = email.split('@').first.trim();
+    return localPart.isEmpty ? 'Google Admin' : localPart;
+  }
+
+  String _resolveFirebaseAccountName(User firebaseUser) {
+    final displayName = firebaseUser.displayName;
+    if (displayName != null && displayName.trim().isNotEmpty) {
+      return displayName.trim();
+    }
+    final email = firebaseUser.email ?? '';
+    final localPart = email.split('@').first.trim();
+    return localPart.isEmpty ? 'Google Admin' : localPart;
   }
 
   Future<bool> _runBusy(Future<void> Function() action) async {

@@ -6,6 +6,7 @@ import 'app_scope.dart';
 import 'core/localization/app_strings.dart';
 import 'core/theme/app_theme.dart';
 import 'features/dashboard/dashboard_screen.dart';
+import 'features/auth/login_screen.dart';
 import 'features/inventory/inventory_screen.dart';
 import 'features/menu/menu_management_screen.dart';
 import 'features/orders/orders_screen.dart';
@@ -104,6 +105,16 @@ class _LocalPosAppState extends State<LocalPosApp> with WidgetsBindingObserver {
         onFinished: () {
           setState(() {
             _showSplash = false;
+            _showIntro = !_controller.hasSeenIntro;
+            _initialShellIndex = _showIntro ? 4 : 0;
+          });
+        },
+      );
+    }
+    if (!_controller.isLoggedIn) {
+      return LoginScreen(
+        onSignedIn: () {
+          setState(() {
             _showIntro = !_controller.hasSeenIntro;
             _initialShellIndex = _showIntro ? 4 : 0;
           });
