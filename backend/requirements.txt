@@ -11,3 +11,4 @@ python-dotenv>=1.0
 aiofiles>=24.1
 pyngrok>=7.2
 pydantic-settings>=2.0
+httpx>=0.28

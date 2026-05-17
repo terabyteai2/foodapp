@@ -93,6 +93,7 @@ class PosAppController extends ChangeNotifier {
   bool isLoggedIn = false;
   String accountEmail = '';
   String accountUsername = '';
+  String googleUid = '';
   String _accountPassword = '';
   List<MenuItem> menuItems = [];
   List<OrderModel> orders = [];
@@ -205,6 +206,8 @@ class PosAppController extends ChangeNotifier {
         autoSyncIntervalSeconds: preferences.getInt(_autoSyncIntervalKey) ?? 30,
       );
       final firebaseUser = FirebaseAuth.instance.currentUser;
+      googleUid =
+          firebaseUser?.uid ?? preferences.getString(_googleUidKey) ?? '';
       accountEmail =
           firebaseUser?.email ?? preferences.getString(_accountEmailKey) ?? '';
       accountUsername =
@@ -318,6 +321,19 @@ class PosAppController extends ChangeNotifier {
     required String restaurantName,
     required String outletName,
   }) async {
+    if (googleUid.trim().isNotEmpty && accountEmail.trim().isNotEmpty) {
+      await _provisionGoogleTenantInternal(
+        restaurantName: restaurantName,
+        outletName: outletName,
+      );
+      isLoggedIn = true;
+      hasSeenIntro = true;
+      await _persistAccountAuth();
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setBool(_seenIntroKey, true);
+      notifyListeners();
+      return;
+    }
     serverConfig = serverConfig.copyWith(
       restaurantName: restaurantName.trim(),
       outletName: outletName.trim().isEmpty ? 'Main Outlet' : outletName.trim(),
@@ -523,8 +539,10 @@ class PosAppController extends ChangeNotifier {
         }
         accountEmail = user.email ?? '';
         accountUsername = _resolveFirebaseAccountName(user);
+        googleUid = user.uid;
         _accountPassword = '';
         isLoggedIn = true;
+        await _restoreGoogleTenantIfLinked();
         await _persistAccountAuth();
         return;
       }
@@ -546,8 +564,10 @@ class PosAppController extends ChangeNotifier {
       final user = userCredential.user;
       accountEmail = user?.email ?? googleAccount.email;
       accountUsername = _resolveGoogleAccountName(user, googleAccount);
+      googleUid = user?.uid ?? googleAccount.id;
       _accountPassword = '';
       isLoggedIn = true;
+      await _restoreGoogleTenantIfLinked();
       await _persistAccountAuth();
     });
   }
@@ -579,6 +599,7 @@ class PosAppController extends ChangeNotifier {
     cloudConfig = loginCloudConfig.copyWith(deviceToken: result.deviceToken);
     accountEmail = result.email;
     accountUsername = result.username;
+    googleUid = '';
     _accountPassword = password;
     isLoggedIn = true;
     await _persistSettings();
@@ -986,6 +1007,7 @@ class PosAppController extends ChangeNotifier {
 
   Future<void> _persistAccountAuth() async {
     final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_googleUidKey, googleUid);
     await preferences.setString(_accountEmailKey, accountEmail);
     await preferences.setString(_accountUsernameKey, accountUsername);
     await preferences.setString(_accountPasswordKey, _accountPassword);
@@ -1021,6 +1043,77 @@ class PosAppController extends ChangeNotifier {
     cloudConfig = bootstrapCloudConfig.copyWith(
       deviceToken: tenant.deviceToken,
     );
+    await _persistSettings();
+    syncService.configure(cloudConfig: cloudConfig, serverConfig: serverConfig);
+    unawaited(syncService.syncNow());
+  }
+
+  Future<void> _restoreGoogleTenantIfLinked() async {
+    if (googleUid.trim().isEmpty || accountEmail.trim().isEmpty) return;
+    final googleCloudConfig = cloudConfig.copyWith(
+      baseUrl: CloudDefaults.resolveBaseUrl(cloudConfig.baseUrl),
+      enabled: true,
+    );
+    cloudApiService.configure(
+      cloudConfig: googleCloudConfig,
+      serverConfig: serverConfig,
+    );
+    try {
+      final result = await cloudApiService.loginGoogleAccount(
+        googleUid: googleUid,
+        email: accountEmail,
+        displayName: accountUsername,
+        serverId: serverConfig.serverId,
+      );
+      await _applyCloudLoginResult(result, googleCloudConfig);
+    } on CloudApiException catch (error) {
+      final message = error.toString();
+      if (message.contains('No restaurant is linked')) {
+        return;
+      }
+      lastError = message;
+    }
+  }
+
+  Future<void> _provisionGoogleTenantInternal({
+    required String restaurantName,
+    required String outletName,
+  }) async {
+    final googleCloudConfig = cloudConfig.copyWith(
+      baseUrl: CloudDefaults.resolveBaseUrl(cloudConfig.baseUrl),
+      enabled: true,
+    );
+    cloudApiService.configure(
+      cloudConfig: googleCloudConfig,
+      serverConfig: serverConfig,
+    );
+    final result = await cloudApiService.loginGoogleAccount(
+      googleUid: googleUid,
+      email: accountEmail,
+      displayName: accountUsername,
+      serverId: serverConfig.serverId,
+      restaurantName: restaurantName,
+      outletName: outletName.trim().isEmpty ? 'Main Outlet' : outletName,
+      restaurantId: serverConfig.restaurantId,
+      outletId: serverConfig.outletId,
+    );
+    await _applyCloudLoginResult(result, googleCloudConfig);
+  }
+
+  Future<void> _applyCloudLoginResult(
+    AdminLoginResult result,
+    CloudConfig baseCloudConfig,
+  ) async {
+    serverConfig = serverConfig.copyWith(
+      serverId: result.serverId,
+      restaurantId: result.restaurantId,
+      outletId: result.outletId,
+      restaurantName: result.restaurantName,
+      outletName: result.outletName,
+    );
+    cloudConfig = baseCloudConfig.copyWith(deviceToken: result.deviceToken);
+    if (result.email.trim().isNotEmpty) accountEmail = result.email;
+    if (result.username.trim().isNotEmpty) accountUsername = result.username;
     await _persistSettings();
     syncService.configure(cloudConfig: cloudConfig, serverConfig: serverConfig);
     unawaited(syncService.syncNow());
@@ -1080,6 +1173,7 @@ class PosAppController extends ChangeNotifier {
   static final String _bkashTransactionIdKey = 'local_pos_bkash_transaction_id';
   static final String _accountEmailKey = 'local_pos_account_email';
   static final String _accountUsernameKey = 'local_pos_account_username';
+  static final String _googleUidKey = 'local_pos_google_uid';
   static final String _accountPasswordKey = 'local_pos_account_password';
   static final String _accountLoggedInKey = 'local_pos_account_logged_in';
   static final String _tableCountKey = 'local_pos_table_count';

@@ -249,6 +249,41 @@ class CloudApiService {
     return AdminLoginResult.fromJson(response);
   }
 
+  Future<AdminLoginResult> loginGoogleAccount({
+    required String googleUid,
+    required String email,
+    required String displayName,
+    required String serverId,
+    String? restaurantName,
+    String? outletName,
+    String? restaurantId,
+    String? outletId,
+  }) async {
+    final uri = _uri('/admin/google');
+    if (uri == null) {
+      throw CloudApiException('Cloud API URL is empty or invalid.');
+    }
+    final response = await _sendJson(
+      'POST',
+      uri,
+      body: {
+        'googleUid': googleUid.trim(),
+        'email': email.trim(),
+        'displayName': displayName.trim(),
+        'serverId': serverId,
+        if (restaurantName?.trim().isNotEmpty == true)
+          'restaurantName': restaurantName!.trim(),
+        if (outletName?.trim().isNotEmpty == true)
+          'outletName': outletName!.trim(),
+        if (restaurantId?.trim().isNotEmpty == true)
+          'restaurantId': restaurantId!.trim(),
+        if (outletId?.trim().isNotEmpty == true) 'outletId': outletId!.trim(),
+      },
+      idempotencyKey: 'google-tenant-${googleUid.trim()}',
+    );
+    return AdminLoginResult.fromJson(response);
+  }
+
   Future<BkashPaymentSession> createBkashSandboxPayment({
     required String serverId,
     required double amount,

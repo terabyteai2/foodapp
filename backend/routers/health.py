@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from database import check_local_database, check_supabase_database
 from network import local_base_url
 from schemas import ok
-from sync_worker import internet_available, sync_status
+from sync_worker import check_supabase_rest, internet_available, sync_status
 
 router = APIRouter()
 
@@ -50,7 +50,9 @@ async def internet_health():
 
 @router.get("/health/supabase")
 async def supabase_health():
-    return ok({"connected": await check_supabase_database()})
+    return ok({
+        "connected": await check_supabase_database() or await check_supabase_rest()
+    })
 
 
 @router.get("/health/sync")

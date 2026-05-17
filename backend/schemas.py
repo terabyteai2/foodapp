@@ -46,6 +46,17 @@ class AdminCreateRequest(BaseModel):
     password: str
 
 
+class GoogleTenantRequest(BaseModel):
+    googleUid: str
+    email: str
+    displayName: str | None = None
+    serverId: str
+    restaurantName: str | None = None
+    outletName: str | None = None
+    restaurantId: str | None = None
+    outletId: str | None = None
+
+
 # ── Devices ───────────────────────────────────────────────────────────────────
 
 class DeviceRegisterRequest(BaseModel):

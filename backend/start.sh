@@ -19,4 +19,15 @@ fi
 echo "Docs: http://localhost:8000/docs"
 echo ""
 
+if [ -d .local_pg_data ]; then
+  if ! /usr/lib/postgresql/18/bin/pg_isready -h localhost -p 55432 >/dev/null 2>&1; then
+    mkdir -p .local_pg_logs .local_pg_socket
+    /usr/lib/postgresql/18/bin/pg_ctl \
+      -D .local_pg_data \
+      -l .local_pg_logs/postgres.log \
+      -o "-p 55432 -k $(pwd)/.local_pg_socket" \
+      start
+  fi
+fi
+
 NGROK_AUTHTOKEN="" NGROK_STATIC_DOMAIN="" python3 main.py

@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 *.pyo
+.local_pg_data/
+.local_pg_logs/
+.local_pg_socket/
 uploads/menu_images/
 frontend_dist/
 *.db

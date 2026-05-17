@@ -1,7 +1,7 @@
 class CloudDefaults {
   CloudDefaults._();
 
-  static String productionBaseUrl = 'http://192.168.43.19:8000';
+  static String productionBaseUrl = 'http://192.168.1.102:8000';
 
   static String placeholderBaseUrl = 'https://your-domain.ngrok-free.app';
 

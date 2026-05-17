@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost/rastarant"
     LOCAL_DATABASE_URL: str = ""
     SUPABASE_DATABASE_URL: str = ""
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
     SECRET_KEY: str = "change-me"
     IMAGES_DIR: str = "./uploads/menu_images"
     OUTLET_IMAGES_DIR: str = "./uploads/outlet_images"
@@ -34,6 +36,27 @@ class Settings(BaseSettings):
     @property
     def has_supabase_database(self) -> bool:
         return bool(self.supabase_database_url)
+
+    @property
+    def supabase_url(self) -> str:
+        return self.SUPABASE_URL.strip().rstrip("/")
+
+    @property
+    def supabase_rest_url(self) -> str:
+        base = self.supabase_url
+        if not base:
+            return ""
+        if base.endswith("/rest/v1"):
+            return base
+        return f"{base}/rest/v1"
+
+    @property
+    def supabase_service_role_key(self) -> str:
+        return self.SUPABASE_SERVICE_ROLE_KEY.strip()
+
+    @property
+    def has_supabase_rest(self) -> bool:
+        return bool(self.supabase_rest_url and self.supabase_service_role_key)
 
 
 settings = Settings()

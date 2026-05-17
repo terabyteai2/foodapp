@@ -223,12 +223,11 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final text = AppScope.of(context).strings;
-    final destinations = _destinations(text);
+    final destinations = _destinations();
     final pages = [
-      DashboardScreen(onNavigate: _setIndex),
       OrdersScreen(),
       MenuManagementScreen(),
+      DashboardScreen(onNavigate: _setIndex),
       InventoryScreen(),
       SettingsScreen(),
     ];
@@ -307,25 +306,21 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _setIndex(int index) {
-    final maxIndex = _destinations(AppScope.of(context).strings).length - 1;
+    final maxIndex = _destinations().length - 1;
     setState(() => _selectedIndex = index.clamp(0, maxIndex));
   }
 
-  List<_Destination> _destinations(AppStrings text) {
+  List<_Destination> _destinations() {
     return [
-      _Destination('Home', Icons.home_outlined, Icons.home_rounded),
+      _Destination('Order', Icons.receipt_long_outlined, Icons.receipt_long),
       _Destination(
-        text.orders,
-        Icons.receipt_long_outlined,
-        Icons.receipt_long,
-      ),
-      _Destination(
-        text.menu,
+        'Menu',
         Icons.restaurant_menu_outlined,
         Icons.restaurant_menu,
       ),
-      _Destination('Stock', Icons.grid_on_outlined, Icons.grid_on_rounded),
-      _Destination('More', Icons.more_horiz_rounded, Icons.more_horiz_rounded),
+      _Destination('Home', Icons.home_outlined, Icons.home_rounded),
+      _Destination('Stock', Icons.inventory_2_outlined, Icons.inventory_2),
+      _Destination('Setting', Icons.settings_outlined, Icons.settings_rounded),
     ];
   }
 }
