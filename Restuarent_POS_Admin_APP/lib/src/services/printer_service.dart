@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/order_item.dart';
 import '../models/order_model.dart';
 
 class BluetoothPrinterDevice {
@@ -269,33 +270,22 @@ class PrinterService {
     String? restaurantName,
     String? outletName,
   }) async {
-    final currency = NumberFormat.currency(symbol: '৳', decimalDigits: 0);
-    final buffer = StringBuffer()
-      ..writeln(_ticketText(restaurantName ?? 'HYBRID POS'))
-      ..writeln(_ticketText(outletName ?? 'Kitchen Ticket'))
-      ..writeln('Serial: ${order.displaySequence}')
-      ..writeln('Order: ${order.orderNo}')
-      ..writeln('Source: ${order.source.label}')
-      ..writeln('Table: ${order.tableNo ?? 'Takeaway'}')
-      ..writeln('Customer: ${order.customerName ?? '-'}')
-      ..writeln(
-        'Time: ${DateFormat('MMM d, yyyy h:mm a').format(order.createdAt)}',
-      );
-    final note = order.note?.trim();
-    if (note != null && note.isNotEmpty) {
-      buffer.writeln('Note: ${_ticketText(note)}');
-    }
-    buffer.writeln('--------------------------------');
-    for (final item in order.items) {
-      buffer.writeln('${item.qty}x ${_ticketText(item.name)}');
-      buffer.writeln(
-        '  ${currency.format(item.price)} x ${item.qty} = ${currency.format(item.lineTotal)}',
-      );
-    }
+    final buffer = StringBuffer();
+    _writePreviewCopy(
+      buffer,
+      order,
+      copyLabel: 'ADMIN COPY',
+      restaurantName: restaurantName ?? 'HYBRID POS',
+    );
     buffer
-      ..writeln('--------------------------------')
-      ..writeln('Total: ${currency.format(order.total)}')
-      ..writeln('Status: ${order.status.label}');
+      ..writeln()
+      ..writeln('********************************');
+    _writePreviewCopy(
+      buffer,
+      order,
+      copyLabel: 'CUSTOMER COPY',
+      restaurantName: restaurantName ?? 'HYBRID POS',
+    );
     return buffer.toString();
   }
 
@@ -306,75 +296,94 @@ class PrinterService {
   }) async {
     final profile = await CapabilityProfile.load();
     final generator = Generator(PaperSize.mm58, profile);
-    final currency = NumberFormat.currency(symbol: '৳', decimalDigits: 0);
     final bytes = <int>[];
     bytes
       ..addAll(generator.reset())
       ..addAll(
-        generator.text(
-          _ticketText(restaurantName, fallback: 'HYBRID POS'),
-          styles: PosStyles(
-            align: PosAlign.center,
-            bold: true,
-            height: PosTextSize.size2,
-            width: PosTextSize.size2,
-          ),
+        _buildCompactCopy(
+          generator,
+          order,
+          copyLabel: 'ADMIN COPY',
+          restaurantName: restaurantName,
+          outletName: outletName,
         ),
       )
+      ..addAll(generator.feed(1))
+      ..addAll(generator.hr(ch: '*'))
+      ..addAll(
+        _buildCompactCopy(
+          generator,
+          order,
+          copyLabel: 'CUSTOMER COPY',
+          restaurantName: restaurantName,
+          outletName: outletName,
+        ),
+      )
+      ..addAll(generator.feed(2))
+      ..addAll(generator.cut());
+    return bytes;
+  }
+
+  List<int> _buildCompactCopy(
+    Generator generator,
+    OrderModel order, {
+    required String copyLabel,
+    required String restaurantName,
+    required String outletName,
+  }) {
+    final currency = NumberFormat.currency(symbol: 'Tk ', decimalDigits: 0);
+    final date = DateFormat('dd MMM yy  h:mm a').format(order.createdAt);
+    final bytes = <int>[];
+    bytes
       ..addAll(
         generator.text(
-          _ticketText(outletName, fallback: 'Kitchen Ticket'),
+          _ticketText(restaurantName, fallback: 'Restaurant'),
           styles: PosStyles(align: PosAlign.center, bold: true),
         ),
       )
-      ..addAll(generator.hr())
       ..addAll(
         generator.text(
-          '${order.displaySequence}  ORDER ${_ticketText(order.orderNo)}',
+          copyLabel,
           styles: PosStyles(align: PosAlign.center, bold: true),
         ),
       )
-      ..addAll(generator.text('Source: ${order.source.label}'))
-      ..addAll(
-        generator.text('Table: ${_ticketText(order.tableNo ?? 'Takeaway')}'),
-      )
-      ..addAll(
-        generator.text('Customer: ${_ticketText(order.customerName ?? '-')}'),
-      )
+      ..addAll(generator.text('No: ${order.displaySequence}   $date'))
       ..addAll(
         generator.text(
-          'Time: ${DateFormat('MMM d, yyyy h:mm a').format(order.createdAt)}',
+          'Table: ${_shortText(order.tableNo ?? 'Takeaway', 18)}   ${order.source.label}',
         ),
       );
+    final customer = order.customerName?.trim();
+    if (customer != null && customer.isNotEmpty) {
+      bytes.addAll(generator.text('Name: ${_shortText(customer, 26)}'));
+    }
     final note = order.note?.trim();
-    if (note != null && note.isNotEmpty) {
-      bytes.addAll(generator.text('Note: ${_ticketText(note)}'));
+    if (copyLabel == 'ADMIN COPY' && note != null && note.isNotEmpty) {
+      bytes.addAll(generator.text('Note: ${_shortText(note, 26)}'));
     }
     bytes.addAll(generator.hr());
 
-    for (final item in order.items) {
-      bytes
-        ..addAll(
-          generator.text(
-            '${item.qty}x ${_ticketText(item.name)}',
-            styles: PosStyles(bold: true),
+    for (var i = 0; i < order.items.length; i++) {
+      final item = order.items[i];
+      bytes.addAll(
+        generator.row([
+          PosColumn(
+            text: '${i + 1}. ${_itemLabel(item)}',
+            width: 7,
+            styles: PosStyles(bold: copyLabel == 'ADMIN COPY'),
           ),
-        )
-        ..addAll(
-          generator.row([
-            PosColumn(text: currency.format(item.price), width: 4),
-            PosColumn(
-              text: 'x ${item.qty}',
-              width: 2,
-              styles: PosStyles(align: PosAlign.center),
-            ),
-            PosColumn(
-              text: currency.format(item.lineTotal),
-              width: 6,
-              styles: PosStyles(align: PosAlign.right),
-            ),
-          ]),
-        );
+          PosColumn(
+            text: '${item.qty}x',
+            width: 2,
+            styles: PosStyles(align: PosAlign.center),
+          ),
+          PosColumn(
+            text: currency.format(item.lineTotal),
+            width: 3,
+            styles: PosStyles(align: PosAlign.right),
+          ),
+        ]),
+      );
     }
 
     bytes
@@ -388,11 +397,75 @@ class PrinterService {
             styles: PosStyles(align: PosAlign.right, bold: true),
           ),
         ]),
-      )
-      ..addAll(generator.text('Status: ${order.status.label}'))
-      ..addAll(generator.feed(2))
-      ..addAll(generator.cut());
+      );
+    if (copyLabel == 'CUSTOMER COPY') {
+      bytes.addAll(
+        generator.text('Thank you', styles: PosStyles(align: PosAlign.center)),
+      );
+    } else {
+      bytes.addAll(generator.text('Status: ${order.status.label}'));
+    }
     return bytes;
+  }
+
+  void _writePreviewCopy(
+    StringBuffer buffer,
+    OrderModel order, {
+    required String copyLabel,
+    required String restaurantName,
+  }) {
+    final currency = NumberFormat.currency(symbol: 'Tk ', decimalDigits: 0);
+    buffer
+      ..writeln(_ticketText(restaurantName))
+      ..writeln(copyLabel)
+      ..writeln(
+        'No: ${order.displaySequence}   ${DateFormat('dd MMM yy h:mm a').format(order.createdAt)}',
+      )
+      ..writeln('Table: ${order.tableNo ?? 'Takeaway'}   ${order.source.label}')
+      ..writeln('--------------------------------');
+    for (var i = 0; i < order.items.length; i++) {
+      final item = order.items[i];
+      buffer.writeln(
+        '${i + 1}. ${_itemLabel(item)}  ${item.qty}x  ${currency.format(item.lineTotal)}',
+      );
+    }
+    buffer
+      ..writeln('--------------------------------')
+      ..writeln('TOTAL ${currency.format(order.total)}');
+    if (copyLabel == 'ADMIN COPY') {
+      buffer.writeln('Status: ${order.status.label}');
+    }
+  }
+
+  String _itemLabel(OrderItem item) {
+    final name = _ticketText(item.name);
+    final unit = _extractUnit(name);
+    final baseName = unit == null
+        ? name
+        : name
+              .replaceFirst(unit, '')
+              .replaceAll(RegExp(r'[-–—,]+'), ' ')
+              .replaceAll(RegExp(r'\s+'), ' ')
+              .trim();
+    final label = unit == null
+        ? name
+        : '${baseName.isEmpty ? 'Item' : baseName} - $unit';
+    return _shortText(label, 17);
+  }
+
+  String? _extractUnit(String name) {
+    final match = RegExp(
+      r'(\d+(?:\.\d+)?\s?(?:g|gm|kg|ml|l|pcs|pc))\b',
+      caseSensitive: false,
+    ).firstMatch(name);
+    return match?.group(1);
+  }
+
+  String _shortText(String value, int maxChars) {
+    final clean = _ticketText(value).replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (clean.length <= maxChars) return clean;
+    if (maxChars <= 1) return clean.substring(0, maxChars);
+    return clean.substring(0, maxChars - 1).trimRight();
   }
 
   Future<void> _ensureBluetoothReady() async {

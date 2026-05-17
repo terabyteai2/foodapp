@@ -737,6 +737,12 @@ class PosAppController extends ChangeNotifier {
 
   Future<void> updateOrderStatus(String id, OrderStatus status) async {
     await database.updateOrderStatus(id, status);
+    if (status.adminStatus == OrderStatus.accepted) {
+      final order = await database.getOrderById(id);
+      if (order != null) {
+        await _printAcceptedOrderIfNeeded(order);
+      }
+    }
     unawaited(syncService.syncNow());
   }
 
@@ -893,23 +899,38 @@ class PosAppController extends ChangeNotifier {
     if (!printerState.autoPrintEnabled || !printerState.hasSelectedPrinter) {
       return;
     }
-    final newOrders =
+    final acceptedOrders =
         orders
             .where((order) {
-              return !previousOrderIds.contains(order.id) &&
+              final becameAccepted =
+                  !previousOrderIds.contains(order.id) ||
+                  order.status.adminStatus == OrderStatus.accepted;
+              return becameAccepted &&
+                  order.status.adminStatus == OrderStatus.accepted &&
                   !printerService.hasPrintedOrder(order.id) &&
                   !_autoPrintInFlight.contains(order.id);
             })
             .toList(growable: false)
           ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
-    for (final order in newOrders) {
-      _autoPrintInFlight.add(order.id);
-      try {
-        await printOrderTicket(order);
-      } finally {
-        _autoPrintInFlight.remove(order.id);
-      }
+    for (final order in acceptedOrders) {
+      await _printAcceptedOrderIfNeeded(order);
+    }
+  }
+
+  Future<void> _printAcceptedOrderIfNeeded(OrderModel order) async {
+    if (!printerState.autoPrintEnabled ||
+        !printerState.hasSelectedPrinter ||
+        order.status.adminStatus != OrderStatus.accepted ||
+        printerService.hasPrintedOrder(order.id) ||
+        _autoPrintInFlight.contains(order.id)) {
+      return;
+    }
+    _autoPrintInFlight.add(order.id);
+    try {
+      await printOrderTicket(order);
+    } finally {
+      _autoPrintInFlight.remove(order.id);
     }
   }
 

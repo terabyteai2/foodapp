@@ -128,10 +128,8 @@ class _OrdersScreenState extends State<OrdersScreen>
     final result = await Navigator.of(context).push<_OrderResult>(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => _NewOrderPage(
-          menuItems: menuItems,
-          tableCount: tableCount,
-        ),
+        builder: (_) =>
+            _NewOrderPage(menuItems: menuItems, tableCount: tableCount),
       ),
     );
     if (result == null || !context.mounted) return;
@@ -144,7 +142,9 @@ class _OrdersScreenState extends State<OrdersScreen>
 
     if (!context.mounted) return;
 
-    final printed = app.printerState.connected
+    final printed = app.printerService.hasPrintedOrder(order.id)
+        ? true
+        : app.printerState.connected
         ? await app.printOrderTicket(order)
         : false;
 
@@ -951,11 +951,7 @@ class _OrderCreatedSheet extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _OrderResult {
-  _OrderResult({
-    required this.items,
-    this.tableNo,
-    this.note,
-  });
+  _OrderResult({required this.items, this.tableNo, this.note});
   final List<OrderRequestItem> items;
   final String? tableNo;
   final String? note;
@@ -1106,8 +1102,7 @@ class _NewOrderPageState extends State<_NewOrderPage> {
                         setState(() => _selectedCategory = c),
                     onTap: _tap,
                     onDecrement: _decrement,
-                    onToggleNote: () =>
-                        setState(() => _showNote = !_showNote),
+                    onToggleNote: () => setState(() => _showNote = !_showNote),
                     onSubmit: _cart.isNotEmpty ? _submit : null,
                   ),
                 ],
