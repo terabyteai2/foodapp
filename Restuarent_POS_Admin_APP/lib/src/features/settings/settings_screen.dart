@@ -2390,16 +2390,14 @@ class _HeroMediaPageState extends State<_HeroMediaPage> {
                                     width: 110,
                                     height: 110,
                                     fit: BoxFit.cover,
-                                    errorBuilder:
-                                        (context, error, stackTrace) =>
-                                            Container(
-                                              width: 110,
-                                              height: 110,
-                                              color: Colors.grey.shade200,
-                                              child: const Icon(
-                                                Icons.broken_image_outlined,
-                                              ),
-                                            ),
+                                    errorBuilder: (_, _, _) => Container(
+                                      width: 110,
+                                      height: 110,
+                                      color: Colors.grey.shade200,
+                                      child: const Icon(
+                                        Icons.broken_image_outlined,
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 Positioned(
