@@ -86,6 +86,7 @@ class PrinterService {
   static const String _printerNameKey = 'printer_selected_name';
   static const String _printerAddressKey = 'printer_selected_address';
   static const String _printedOrderIdsKey = 'printer_printed_order_ids';
+  static const int _ticketWidth = 32;
 
   final StreamController<PrinterRuntimeState> _stateController =
       StreamController<PrinterRuntimeState>.broadcast();
@@ -277,9 +278,7 @@ class PrinterService {
       copyLabel: 'ADMIN COPY',
       restaurantName: restaurantName ?? 'HYBRID POS',
     );
-    buffer
-      ..writeln()
-      ..writeln('********************************');
+    buffer.writeln(_separator('*'));
     _writePreviewCopy(
       buffer,
       order,
@@ -308,8 +307,7 @@ class PrinterService {
           outletName: outletName,
         ),
       )
-      ..addAll(generator.feed(1))
-      ..addAll(generator.hr(ch: '*'))
+      ..addAll(generator.text(_separator('*')))
       ..addAll(
         _buildCompactCopy(
           generator,
@@ -319,8 +317,7 @@ class PrinterService {
           outletName: outletName,
         ),
       )
-      ..addAll(generator.feed(2))
-      ..addAll(generator.cut());
+      ..addAll(generator.feed(1));
     return bytes;
   }
 
@@ -332,7 +329,8 @@ class PrinterService {
     required String outletName,
   }) {
     final currency = NumberFormat.currency(symbol: 'Tk ', decimalDigits: 0);
-    final date = DateFormat('dd MMM yy  h:mm a').format(order.createdAt);
+    final date = DateFormat('dd MMM yy h:mm a').format(order.createdAt);
+    final table = _ticketText(order.tableNo ?? 'Takeaway');
     final bytes = <int>[];
     bytes
       ..addAll(
@@ -347,10 +345,10 @@ class PrinterService {
           styles: PosStyles(align: PosAlign.center, bold: true),
         ),
       )
-      ..addAll(generator.text('No: ${order.displaySequence}   $date'))
+      ..addAll(generator.text(_twoCol('No ${order.displaySequence}', date)))
       ..addAll(
         generator.text(
-          'Table: ${_shortText(order.tableNo ?? 'Takeaway', 18)}   ${order.source.label}',
+          _twoCol('Table ${_shortText(table, 13)}', order.source.label),
         ),
       );
     final customer = order.customerName?.trim();
@@ -361,49 +359,28 @@ class PrinterService {
     if (copyLabel == 'ADMIN COPY' && note != null && note.isNotEmpty) {
       bytes.addAll(generator.text('Note: ${_shortText(note, 26)}'));
     }
-    bytes.addAll(generator.hr());
+    bytes.addAll(generator.text(_separator('-')));
 
     for (var i = 0; i < order.items.length; i++) {
       final item = order.items[i];
-      bytes.addAll(
-        generator.row([
-          PosColumn(
-            text: '${i + 1}. ${_itemLabel(item)}',
-            width: 7,
-            styles: PosStyles(bold: copyLabel == 'ADMIN COPY'),
-          ),
-          PosColumn(
-            text: '${item.qty}x',
-            width: 2,
-            styles: PosStyles(align: PosAlign.center),
-          ),
-          PosColumn(
-            text: currency.format(item.lineTotal),
-            width: 3,
-            styles: PosStyles(align: PosAlign.right),
-          ),
-        ]),
-      );
+      final name = '${i + 1}. ${_itemLabel(item)}';
+      final qty = '${item.qty}x';
+      final total = currency.format(item.lineTotal);
+      bytes.addAll(generator.text(_itemLine(name, qty, total)));
     }
 
     bytes
-      ..addAll(generator.hr())
+      ..addAll(generator.text(_separator('-')))
       ..addAll(
-        generator.row([
-          PosColumn(text: 'TOTAL', width: 5, styles: PosStyles(bold: true)),
-          PosColumn(
-            text: currency.format(order.total),
-            width: 7,
-            styles: PosStyles(align: PosAlign.right, bold: true),
-          ),
-        ]),
+        generator.text(
+          _twoCol('TOTAL', currency.format(order.total)),
+          styles: PosStyles(bold: true),
+        ),
       );
     if (copyLabel == 'CUSTOMER COPY') {
-      bytes.addAll(
-        generator.text('Thank you', styles: PosStyles(align: PosAlign.center)),
-      );
+      bytes.addAll(generator.text(_center('Thank you')));
     } else {
-      bytes.addAll(generator.text('Status: ${order.status.label}'));
+      bytes.addAll(generator.text(_twoCol('Status', order.status.label)));
     }
     return bytes;
   }
@@ -419,21 +396,33 @@ class PrinterService {
       ..writeln(_ticketText(restaurantName))
       ..writeln(copyLabel)
       ..writeln(
-        'No: ${order.displaySequence}   ${DateFormat('dd MMM yy h:mm a').format(order.createdAt)}',
+        _twoCol(
+          'No ${order.displaySequence}',
+          DateFormat('dd MMM yy h:mm a').format(order.createdAt),
+        ),
       )
-      ..writeln('Table: ${order.tableNo ?? 'Takeaway'}   ${order.source.label}')
-      ..writeln('--------------------------------');
+      ..writeln(
+        _twoCol(
+          'Table ${_shortText(order.tableNo ?? 'Takeaway', 13)}',
+          order.source.label,
+        ),
+      )
+      ..writeln(_separator('-'));
     for (var i = 0; i < order.items.length; i++) {
       final item = order.items[i];
       buffer.writeln(
-        '${i + 1}. ${_itemLabel(item)}  ${item.qty}x  ${currency.format(item.lineTotal)}',
+        _itemLine(
+          '${i + 1}. ${_itemLabel(item)}',
+          '${item.qty}x',
+          currency.format(item.lineTotal),
+        ),
       );
     }
     buffer
-      ..writeln('--------------------------------')
-      ..writeln('TOTAL ${currency.format(order.total)}');
+      ..writeln(_separator('-'))
+      ..writeln(_twoCol('TOTAL', currency.format(order.total)));
     if (copyLabel == 'ADMIN COPY') {
-      buffer.writeln('Status: ${order.status.label}');
+      buffer.writeln(_twoCol('Status', order.status.label));
     }
   }
 
@@ -450,7 +439,7 @@ class PrinterService {
     final label = unit == null
         ? name
         : '${baseName.isEmpty ? 'Item' : baseName} - $unit';
-    return _shortText(label, 17);
+    return _shortText(label, 18);
   }
 
   String? _extractUnit(String name) {
@@ -466,6 +455,34 @@ class PrinterService {
     if (clean.length <= maxChars) return clean;
     if (maxChars <= 1) return clean.substring(0, maxChars);
     return clean.substring(0, maxChars - 1).trimRight();
+  }
+
+  String _separator(String ch) => ch * _ticketWidth;
+
+  String _center(String value) {
+    final clean = _shortText(value, _ticketWidth);
+    final left = ((_ticketWidth - clean.length) / 2).floor();
+    return '${' ' * left}$clean';
+  }
+
+  String _twoCol(String left, String right) {
+    final cleanRight = _shortText(right, 14);
+    final leftWidth = _ticketWidth - cleanRight.length - 1;
+    final cleanLeft = _shortText(left, leftWidth);
+    final gap = _ticketWidth - cleanLeft.length - cleanRight.length;
+    return '$cleanLeft${' ' * gap}$cleanRight';
+  }
+
+  String _itemLine(String name, String qty, String total) {
+    final cleanTotal = _shortText(total, 8);
+    final cleanQty = _shortText(qty, 3);
+    final nameWidth = _ticketWidth - cleanQty.length - cleanTotal.length - 2;
+    final cleanName = _shortText(name, nameWidth);
+    final used = cleanName.length + cleanQty.length + cleanTotal.length;
+    final gap = _ticketWidth - used;
+    final leftGap = gap <= 1 ? 1 : 2;
+    final rightGap = gap - leftGap;
+    return '$cleanName${' ' * leftGap}$cleanQty${' ' * rightGap}$cleanTotal';
   }
 
   Future<void> _ensureBluetoothReady() async {

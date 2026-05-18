@@ -399,7 +399,7 @@ class SyncService {
     );
     // Attach REST base URL + device token so the native WS can connect
     realtimeConfig = realtimeConfig.withRestInfo(
-      restBaseUrl: _cloudConfig.baseUrl,
+      restBaseUrl: _cloudApi.effectiveBaseUrl,
       deviceToken: _cloudConfig.deviceToken,
     );
     if (!realtimeConfig.canConnect) return;

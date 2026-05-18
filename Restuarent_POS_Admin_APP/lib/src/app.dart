@@ -165,7 +165,10 @@ class _WindowScale extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    final safeScale = scale.clamp(0.78, 1.08).toDouble();
+    final safeScale = scale.clamp(
+      PosAppController.minUiScale,
+      PosAppController.maxUiScale,
+    );
     if ((safeScale - 1).abs() < 0.001) return child;
 
     final size = mediaQuery.size;

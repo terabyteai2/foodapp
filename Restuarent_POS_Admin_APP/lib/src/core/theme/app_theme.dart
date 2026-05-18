@@ -54,26 +54,28 @@ class _PosPalette {
 class PosColors {
   // Dark-first palette — exact tokens from wireframe SystemNotes
   static const _dark = _PosPalette(
-    primary: Color(0xFFE8C547),     // brand
-    primaryDark: Color(0xFF14110E), // surface-0 / app bg (used as dark fg on brand buttons)
+    primary: Color(0xFFE8C547), // brand
+    primaryDark: Color(
+      0xFF14110E,
+    ), // surface-0 / app bg (used as dark fg on brand buttons)
     primarySoft: Color(0x33E8C547), // brand/20 tint
     primaryGlow: Color(0xFFE8C547),
-    accent: Color(0xFFE8A14A),      // cooking / warm accent
+    accent: Color(0xFFE8A14A), // cooking / warm accent
     accentSoft: Color(0x1AE8C547),
     background: Color(0xFF14110E), // surface-0
-    surface: Color(0xFF1F1C18),    // surface-1 / cards
+    surface: Color(0xFF1F1C18), // surface-1 / cards
     surfaceWarm: Color(0xFF2A2622), // surface-2 / raised elements
     surfaceTinted: Color(0xFF2A2622),
-    slate: Color(0xFFF6F1E4),      // ink-hi / titles
+    slate: Color(0xFFF6F1E4), // ink-hi / titles
     slateSoft: Color(0xFFD8D2C2),
-    muted: Color(0xFF9A9388),      // ink-lo / supporting text
+    muted: Color(0xFF9A9388), // ink-lo / supporting text
     mutedSoft: Color(0xFF5A5450),
-    success: Color(0xFF7BB47C),    // ready / green state
-    warning: Color(0xFFE8A14A),    // cooking state
-    danger: Color(0xFFD86A55),     // danger state
+    success: Color(0xFF7BB47C), // ready / green state
+    warning: Color(0xFFE8A14A), // cooking state
+    danger: Color(0xFFD86A55), // danger state
     info: Color(0xFF4BA3F5),
     purple: Color(0xFFB97AF7),
-    line: Color(0xFF2A2622),       // hairline divider
+    line: Color(0xFF2A2622), // hairline divider
     lineStrong: Color(0xFF3A3630),
   );
 
@@ -146,32 +148,16 @@ class PosRadii {
 
 class PosShadows {
   static List<BoxShadow> get card => [
-    BoxShadow(
-      color: Color(0x55000000),
-      blurRadius: 18,
-      offset: Offset(0, 8),
-    ),
-    BoxShadow(
-      color: Color(0x22000000),
-      blurRadius: 30,
-      offset: Offset(0, 16),
-    ),
+    BoxShadow(color: Color(0x55000000), blurRadius: 18, offset: Offset(0, 8)),
+    BoxShadow(color: Color(0x22000000), blurRadius: 30, offset: Offset(0, 16)),
   ];
 
   static List<BoxShadow> get raised => [
-    BoxShadow(
-      color: Color(0x55000000),
-      blurRadius: 24,
-      offset: Offset(0, 10),
-    ),
+    BoxShadow(color: Color(0x55000000), blurRadius: 24, offset: Offset(0, 10)),
   ];
 
   static List<BoxShadow> get glow => [
-    BoxShadow(
-      color: Color(0x44F2C744),
-      blurRadius: 26,
-      offset: Offset(0, 14),
-    ),
+    BoxShadow(color: Color(0x44F2C744), blurRadius: 26, offset: Offset(0, 14)),
   ];
 }
 
@@ -216,21 +202,22 @@ class AppTheme {
     required double uiScale,
     required Brightness brightness,
   }) {
-    final scale = uiScale.clamp(0.78, 1.08).toDouble();
+    final scale = uiScale.clamp(1.0, 1.28).toDouble();
     double s(double value) => (value * scale).toDouble();
 
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: PosColors.primary,
-      primary: PosColors.primary,
-      secondary: PosColors.accent,
-      surface: PosColors.surface,
-      error: PosColors.danger,
-      brightness: brightness,
-    ).copyWith(
-      surface: PosColors.surface,
-      onSurface: PosColors.slate,
-      surfaceContainerHighest: PosColors.surfaceWarm,
-    );
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: PosColors.primary,
+          primary: PosColors.primary,
+          secondary: PosColors.accent,
+          surface: PosColors.surface,
+          error: PosColors.danger,
+          brightness: brightness,
+        ).copyWith(
+          surface: PosColors.surface,
+          onSurface: PosColors.slate,
+          surfaceContainerHighest: PosColors.surfaceWarm,
+        );
 
     return ThemeData(
       useMaterial3: true,

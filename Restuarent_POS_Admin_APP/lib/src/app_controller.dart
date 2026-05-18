@@ -88,7 +88,7 @@ class PosAppController extends ChangeNotifier {
   String? lastBkashTransactionId;
   AppLanguage language = AppLanguage.bn;
   AppThemePreference themePreference = AppThemePreference.white;
-  double uiScale = 0.9;
+  double uiScale = 1.12;
   String? lastError;
   bool isLoggedIn = false;
   String accountEmail = '';
@@ -136,8 +136,8 @@ class PosAppController extends ChangeNotifier {
 
   String get uiScaleLabel {
     final text = strings;
-    if (uiScale <= 0.88) return text.compact;
-    if (uiScale >= 0.98) return text.large;
+    if (uiScale <= 1.04) return text.compact;
+    if (uiScale >= 1.16) return text.large;
     return text.comfortable;
   }
 
@@ -180,9 +180,18 @@ class PosAppController extends ChangeNotifier {
             )
           : deviceLanguage;
       themePreference = AppThemePreference.white;
-      uiScale = (preferences.getDouble(_uiScaleKey) ?? 0.9)
-          .clamp(minUiScale, maxUiScale)
-          .toDouble();
+      final migratedScale =
+          preferences.getBool(_uiScaleComfortMigrationKey) ?? false;
+      final savedScale = preferences.getDouble(_uiScaleKey);
+      final resolvedScale =
+          !migratedScale && (savedScale == null || savedScale < 1.12)
+          ? 1.12
+          : savedScale ?? 1.12;
+      uiScale = resolvedScale.clamp(minUiScale, maxUiScale).toDouble();
+      if (!migratedScale) {
+        await preferences.setDouble(_uiScaleKey, uiScale);
+        await preferences.setBool(_uiScaleComfortMigrationKey, true);
+      }
       serverConfig = ServerConfig(
         serverId: await _getOrCreatePreference(
           preferences,
@@ -1198,6 +1207,8 @@ class PosAppController extends ChangeNotifier {
   static final String _accountPasswordKey = 'local_pos_account_password';
   static final String _accountLoggedInKey = 'local_pos_account_logged_in';
   static final String _tableCountKey = 'local_pos_table_count';
-  static double minUiScale = 0.78;
-  static double maxUiScale = 1.08;
+  static final String _uiScaleComfortMigrationKey =
+      'local_pos_ui_scale_comfort_migration_v2';
+  static double minUiScale = 1.0;
+  static double maxUiScale = 1.28;
 }

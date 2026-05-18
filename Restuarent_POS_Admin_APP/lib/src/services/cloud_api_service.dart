@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -173,8 +175,11 @@ class CloudApiService {
   );
   ServerConfig? _serverConfig;
   CloudRealtimeConfig? _realtimeConfig;
+  String? _activeBaseUrl;
+  String? _lastFallbackBaseUrl;
 
   CloudRealtimeConfig? get realtimeConfig => _realtimeConfig;
+  String get effectiveBaseUrl => _activeBaseUrl ?? _cloudConfig.baseUrl;
 
   void configure({
     required CloudConfig cloudConfig,
@@ -182,6 +187,8 @@ class CloudApiService {
   }) {
     _cloudConfig = cloudConfig;
     _serverConfig = serverConfig;
+    _activeBaseUrl = null;
+    _lastFallbackBaseUrl = null;
   }
 
   Future<Map<String, Object?>> testHealth() async {
@@ -569,12 +576,7 @@ class CloudApiService {
       headers['Idempotency-Key'] = idempotencyKey;
     }
     final encodedBody = body == null ? null : jsonEncode(body);
-    final response = await _request(
-      method,
-      uri,
-      headers,
-      encodedBody,
-    ).timeout(Duration(seconds: 12));
+    final response = await _sendWithFailover(method, uri, headers, encodedBody);
     final decoded = response.body.trim().isEmpty
         ? <String, Object?>{}
         : jsonDecode(response.body);
@@ -588,6 +590,50 @@ class CloudApiService {
       );
     }
     return payload;
+  }
+
+  Future<http.Response> _sendWithFailover(
+    String method,
+    Uri uri,
+    Map<String, String> headers,
+    String? body,
+  ) async {
+    try {
+      final response = await _request(
+        method,
+        uri,
+        headers,
+        body,
+      ).timeout(Duration(seconds: 12));
+      if (!_shouldRetryStatus(response.statusCode)) {
+        _activeBaseUrl = _baseOrigin(_baseUri() ?? uri);
+        return response;
+      }
+      final fallbackUri = _fallbackUri(uri);
+      if (fallbackUri == null) return response;
+      return _sendFallback(method, fallbackUri, headers, body);
+    } on Object catch (error) {
+      if (!_isNetworkFailure(error)) rethrow;
+      final fallbackUri = _fallbackUri(uri);
+      if (fallbackUri == null) rethrow;
+      return _sendFallback(method, fallbackUri, headers, body);
+    }
+  }
+
+  Future<http.Response> _sendFallback(
+    String method,
+    Uri uri,
+    Map<String, String> headers,
+    String? body,
+  ) async {
+    final response = await _request(
+      method,
+      uri,
+      headers,
+      body,
+    ).timeout(Duration(seconds: 18));
+    _activeBaseUrl = _lastFallbackBaseUrl ?? _baseOrigin(_fallbackBaseUri(uri));
+    return response;
   }
 
   Future<http.Response> _request(
@@ -631,6 +677,63 @@ class CloudApiService {
   Uri? _baseUri() {
     if (!_cloudConfig.canConnect) return null;
     return Uri.tryParse(_cloudConfig.baseUrl.trim());
+  }
+
+  Uri? _fallbackUri(Uri originalUri) {
+    final currentBase = _baseUri();
+    if (currentBase == null) return null;
+    final fallbackBase = CloudDefaults.fallbackBaseUriFor(currentBase);
+    if (fallbackBase == null) return null;
+    _lastFallbackBaseUrl = _baseOrigin(fallbackBase);
+    final endpointPath = _endpointPath(currentBase, originalUri);
+    return fallbackBase.replace(
+      path: _joinPaths(fallbackBase.path, endpointPath),
+      queryParameters: originalUri.queryParameters.isEmpty
+          ? null
+          : originalUri.queryParameters,
+    );
+  }
+
+  Uri _fallbackBaseUri(Uri uri) {
+    return uri.replace(path: '', queryParameters: null, fragment: '');
+  }
+
+  String _endpointPath(Uri base, Uri uri) {
+    final basePath = _normalizePath(base.path);
+    final uriPath = _normalizePath(uri.path);
+    if (basePath.isNotEmpty && uriPath.startsWith('$basePath/')) {
+      return uriPath.substring(basePath.length + 1);
+    }
+    if (basePath.isNotEmpty && uriPath == basePath) return '';
+    return uriPath;
+  }
+
+  String _normalizePath(String value) {
+    var path = value.trim();
+    while (path.startsWith('/')) {
+      path = path.substring(1);
+    }
+    while (path.endsWith('/')) {
+      path = path.substring(0, path.length - 1);
+    }
+    return path;
+  }
+
+  String _baseOrigin(Uri uri) {
+    final path = _normalizePath(uri.path);
+    final portPart = uri.hasPort ? ':${uri.port}' : '';
+    final pathPart = path.isEmpty ? '' : '/$path';
+    return '${uri.scheme}://${uri.host}$portPart$pathPart';
+  }
+
+  bool _shouldRetryStatus(int statusCode) {
+    return statusCode == 502 || statusCode == 503 || statusCode == 504;
+  }
+
+  bool _isNetworkFailure(Object error) {
+    return error is TimeoutException ||
+        error is SocketException ||
+        error is http.ClientException;
   }
 
   String _joinPaths(String basePath, String endpointPath) {

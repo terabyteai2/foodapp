@@ -1640,18 +1640,18 @@ class _DisplaySizeCard extends StatelessWidget {
               children: [
                 _PresetChip(
                   label: text.compact,
-                  selected: value <= 0.88,
-                  onTap: () => onPreset(0.84),
+                  selected: value <= 1.04,
+                  onTap: () => onPreset(1.0),
                 ),
                 _PresetChip(
                   label: text.comfortable,
-                  selected: value > 0.88 && value < 0.98,
-                  onTap: () => onPreset(0.92),
+                  selected: value > 1.04 && value < 1.16,
+                  onTap: () => onPreset(1.12),
                 ),
                 _PresetChip(
                   label: text.large,
-                  selected: value >= 0.98,
-                  onTap: () => onPreset(1.02),
+                  selected: value >= 1.16,
+                  onTap: () => onPreset(1.22),
                 ),
               ],
             ),

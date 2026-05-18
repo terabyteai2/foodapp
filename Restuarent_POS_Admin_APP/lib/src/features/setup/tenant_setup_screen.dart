@@ -116,8 +116,8 @@ class _TenantSetupScreenState extends State<TenantSetupScreen> {
                                 ),
                                 validator: (v) =>
                                     (v == null || v.trim().isEmpty)
-                                        ? 'Please enter your restaurant name'
-                                        : null,
+                                    ? 'Please enter your restaurant name'
+                                    : null,
                               ),
                               SizedBox(height: 16),
                               _FieldLabel('Outlet / Branch Name'),
@@ -137,8 +137,8 @@ class _TenantSetupScreenState extends State<TenantSetupScreen> {
                                 ),
                                 validator: (v) =>
                                     (v == null || v.trim().isEmpty)
-                                        ? 'Please enter an outlet name'
-                                        : null,
+                                    ? 'Please enter an outlet name'
+                                    : null,
                               ),
                               SizedBox(height: 28),
                               SizedBox(
@@ -188,6 +188,15 @@ class _TenantSetupScreenState extends State<TenantSetupScreen> {
       );
       if (!mounted) return;
       widget.onProvisioned();
+    } catch (error) {
+      if (!mounted) return;
+      final appError = AppScope.of(context).lastError;
+      final message = appError?.trim().isNotEmpty == true
+          ? appError!
+          : 'Could not connect to the local server. Start the backend and try again.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

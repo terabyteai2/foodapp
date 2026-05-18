@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../app_scope.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/menu_image_view.dart';
 import '../../core/widgets/pos_compact_ui.dart';
 import '../../models/menu_item.dart';
 import '../../models/order_item.dart';
@@ -45,19 +46,13 @@ class _OrdersScreenState extends State<OrdersScreen>
     final pendingOrders = allOrders
         .where((o) => o.status.adminStatus == OrderStatus.pending)
         .toList(growable: false);
-    final activeOrders = allOrders
-        .where((o) => o.status.isOpen)
+    final acceptedOrders = allOrders
+        .where((o) => o.status.adminStatus == OrderStatus.accepted)
         .toList(growable: false);
-    activeOrders.sort(_sortOrders);
-    final doneOrders = allOrders
-        .where(
-          (o) =>
-              o.status.adminStatus == OrderStatus.served ||
-              o.status.adminStatus == OrderStatus.cancelled,
-        )
-        .toList(growable: false);
-    doneOrders.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    pendingOrders.sort(_sortOrders);
+    acceptedOrders.sort(_sortOrders);
 
+    final menuItems = app.menuItems;
     final canCreate = app.menuItems.any((i) => i.isAvailable);
 
     return Scaffold(
@@ -67,39 +62,32 @@ class _OrdersScreenState extends State<OrdersScreen>
           children: [
             _TopBar(
               pendingCount: pendingOrders.length,
-              activeCount: activeOrders.length,
+              acceptedCount: acceptedOrders.length,
               canCreate: canCreate,
               onAdd: () => _openNewOrderForm(context),
             ),
             _TabStrip(
               controller: _tabs,
-              activeCount: activeOrders.length,
-              doneCount: doneOrders.length,
+              pendingCount: pendingOrders.length,
+              acceptedCount: acceptedOrders.length,
             ),
-            if (pendingOrders.isNotEmpty)
-              _PendingNotice(
-                order: pendingOrders.first,
-                onAccept: () => _changeStatus(
-                  context,
-                  pendingOrders.first,
-                  OrderStatus.accepted,
-                ),
-              ),
             Expanded(
               child: TabBarView(
                 controller: _tabs,
                 children: [
                   _OrderList(
-                    orders: activeOrders,
-                    emptyLabel: 'No active orders',
-                    emptyIcon: Icons.hourglass_empty_rounded,
+                    orders: pendingOrders,
+                    menuItems: menuItems,
+                    emptyLabel: 'No pending orders',
+                    emptyIcon: Icons.inbox_outlined,
                     onPrint: (o) => _printDirect(context, o),
                     onStatus: (o, s) => _changeStatus(context, o, s),
                   ),
                   _OrderList(
-                    orders: doneOrders,
-                    emptyLabel: 'No done orders',
-                    emptyIcon: Icons.check_circle_outline_rounded,
+                    orders: acceptedOrders,
+                    menuItems: menuItems,
+                    emptyLabel: 'No accepted orders',
+                    emptyIcon: Icons.room_service_outlined,
                     onPrint: (o) => _printDirect(context, o),
                     onStatus: (o, s) => _changeStatus(context, o, s),
                   ),
@@ -209,13 +197,13 @@ class _OrdersScreenState extends State<OrdersScreen>
 class _TopBar extends StatelessWidget {
   const _TopBar({
     required this.pendingCount,
-    required this.activeCount,
+    required this.acceptedCount,
     required this.canCreate,
     required this.onAdd,
   });
 
   final int pendingCount;
-  final int activeCount;
+  final int acceptedCount;
   final bool canCreate;
   final VoidCallback onAdd;
 
@@ -225,8 +213,7 @@ class _TopBar extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(12, 14, 12, 7),
       child: CompactHeader(
         title: 'Orders',
-        subtitle:
-            'অর্ডার · $activeCount open${pendingCount > 0 ? ' · $pendingCount pending' : ''}',
+        subtitle: 'অর্ডার · $pendingCount pending · $acceptedCount accepted',
         actions: [
           CompactIconButton(
             icon: Icons.tune_rounded,
@@ -252,13 +239,13 @@ class _TopBar extends StatelessWidget {
 class _TabStrip extends StatelessWidget {
   const _TabStrip({
     required this.controller,
-    required this.activeCount,
-    required this.doneCount,
+    required this.pendingCount,
+    required this.acceptedCount,
   });
 
   final TabController controller;
-  final int activeCount;
-  final int doneCount;
+  final int pendingCount;
+  final int acceptedCount;
 
   @override
   Widget build(BuildContext context) {
@@ -292,10 +279,10 @@ class _TabStrip extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(width: 56, child: Center(child: Text('Active'))),
-                  if (activeCount > 0) ...[
+                  SizedBox(width: 64, child: Center(child: Text('Pending'))),
+                  if (pendingCount > 0) ...[
                     SizedBox(width: 6),
-                    _TabBadge(count: activeCount, active: true),
+                    _TabBadge(count: pendingCount, active: true),
                   ],
                 ],
               ),
@@ -304,10 +291,10 @@ class _TabStrip extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('Done'),
-                  if (doneCount > 0) ...[
+                  Text('Accepted'),
+                  if (acceptedCount > 0) ...[
                     SizedBox(width: 6),
-                    _TabBadge(count: doneCount, active: false),
+                    _TabBadge(count: acceptedCount, active: false),
                   ],
                 ],
               ),
@@ -346,96 +333,6 @@ class _TabBadge extends StatelessWidget {
   }
 }
 
-class _PendingNotice extends StatelessWidget {
-  const _PendingNotice({required this.order, required this.onAccept});
-
-  final OrderModel order;
-  final VoidCallback onAccept;
-
-  @override
-  Widget build(BuildContext context) {
-    final table = (order.tableNo ?? '').trim();
-    final subtitle = table.isEmpty
-        ? '${_formatTime(order.createdAt)} · ${_ago(order.createdAt)} ago'
-        : 'Table $table · ${_formatTime(order.createdAt)} · ${_ago(order.createdAt)} ago';
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(12, 0, 12, 10),
-      child: CompactSurface(
-        color: PosColors.accentSoft,
-        borderColor: PosColors.primary.withValues(alpha: 0.45),
-        padding: EdgeInsets.fromLTRB(10, 9, 8, 9),
-        radius: 9,
-        child: Row(
-          children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: PosColors.primary,
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: Icon(
-                Icons.notifications_active_outlined,
-                color: PosColors.primaryDark,
-                size: 16,
-              ),
-            ),
-            SizedBox(width: 9),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '1 new order pending',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: PosColors.slate,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: PosColors.muted,
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(width: 8),
-            _AdvanceButton(
-              label: 'Accept',
-              color: PosColors.primary,
-              onTap: onAccept,
-              compact: true,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatTime(DateTime dt) {
-    return DateFormat('h:mm a').format(dt.toLocal());
-  }
-
-  String _ago(DateTime dt) {
-    final minutes = DateTime.now().difference(dt.toLocal()).inMinutes;
-    if (minutes < 1) return 'now';
-    if (minutes < 60) return '$minutes min';
-    final hours = (minutes / 60).floor();
-    return '$hours hr';
-  }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Order list
 // ─────────────────────────────────────────────────────────────────────────────
@@ -443,6 +340,7 @@ class _PendingNotice extends StatelessWidget {
 class _OrderList extends StatelessWidget {
   const _OrderList({
     required this.orders,
+    required this.menuItems,
     required this.emptyLabel,
     required this.emptyIcon,
     required this.onPrint,
@@ -450,6 +348,7 @@ class _OrderList extends StatelessWidget {
   });
 
   final List<OrderModel> orders;
+  final List<MenuItem> menuItems;
   final String emptyLabel;
   final IconData emptyIcon;
   final void Function(OrderModel) onPrint;
@@ -471,6 +370,7 @@ class _OrderList extends StatelessWidget {
       separatorBuilder: (_, _) => SizedBox(height: 10),
       itemBuilder: (_, i) => _OrderCard(
         order: orders[i],
+        menuItems: menuItems,
         onPrint: () => onPrint(orders[i]),
         onStatus: (s) => onStatus(orders[i], s),
       ),
@@ -485,11 +385,13 @@ class _OrderList extends StatelessWidget {
 class _OrderCard extends StatelessWidget {
   const _OrderCard({
     required this.order,
+    required this.menuItems,
     required this.onPrint,
     required this.onStatus,
   });
 
   final OrderModel order;
+  final List<MenuItem> menuItems;
   final VoidCallback onPrint;
   final ValueChanged<OrderStatus> onStatus;
 
@@ -499,7 +401,6 @@ class _OrderCard extends StatelessWidget {
     final time = _formatTime(order.createdAt.toLocal());
     final adminStatus = order.status.adminStatus;
     final isPending = adminStatus == OrderStatus.pending;
-    final isAccepted = adminStatus == OrderStatus.accepted;
     final accentColor = switch (adminStatus) {
       OrderStatus.pending => PosColors.warning,
       OrderStatus.accepted => PosColors.success,
@@ -508,82 +409,128 @@ class _OrderCard extends StatelessWidget {
       OrderStatus.preparing => PosColors.success,
       OrderStatus.ready => PosColors.success,
     };
-    final nextStatus = isPending
-        ? OrderStatus.accepted
-        : isAccepted
-        ? OrderStatus.served
-        : null;
-    final nextLabel = isPending
-        ? 'Accept'
-        : isAccepted
-        ? 'Serve'
-        : null;
+    final nextStatus = isPending ? OrderStatus.accepted : null;
+    final table = (order.tableNo ?? '').trim();
+    final itemCount = order.items.fold<int>(0, (sum, item) => sum + item.qty);
+    final summary = _itemsSummary();
 
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onLongPress: onPrint,
         child: Container(
+          constraints: BoxConstraints(minHeight: 142),
           decoration: BoxDecoration(
             color: PosColors.surface,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: PosColors.lineStrong),
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                width: 4,
-                height: 184,
-                decoration: BoxDecoration(
-                  color: accentColor,
-                  borderRadius: BorderRadius.horizontal(
-                    left: Radius.circular(10),
-                  ),
+              SizedBox(
+                width: 124,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    MenuImageView(imageUrl: _primaryImageUrl()),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.10),
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.42),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 8,
+                      top: 8,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: accentColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.72),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 8,
+                      right: 8,
+                      bottom: 8,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$itemCount item${itemCount == 1 ? '' : 's'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              height: 1,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            order.items.isEmpty
+                                ? 'Order'
+                                : order.items.first.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.86),
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              height: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Expanded(
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(12, 11, 10, 10),
+                  padding: EdgeInsets.fromLTRB(12, 10, 10, 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            order.displaySequence,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 15,
-                              color: PosColors.slate,
-                              letterSpacing: 0,
+                          Expanded(
+                            child: Text(
+                              order.displaySequence,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                                color: PosColors.slate,
+                                letterSpacing: 0,
+                                height: 1,
+                              ),
                             ),
                           ),
                           SizedBox(width: 8),
-                          if ((order.tableNo ?? '').isNotEmpty) ...[
-                            Icon(
-                              Icons.table_restaurant_outlined,
-                              size: 11,
-                              color: PosColors.muted,
-                            ),
-                            SizedBox(width: 3),
-                            Text(
-                              'Table ${order.tableNo}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 9.5,
-                                color: PosColors.muted,
-                              ),
-                            ),
-                          ],
-                          Spacer(),
                           Container(
                             padding: EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
+                              horizontal: 7,
+                              vertical: 4,
                             ),
                             decoration: BoxDecoration(
                               color: accentColor.withValues(alpha: 0.12),
@@ -598,135 +545,117 @@ class _OrderCard extends StatelessWidget {
                               adminStatus.label.toUpperCase(),
                               style: TextStyle(
                                 fontWeight: FontWeight.w900,
-                                fontSize: 8,
+                                fontSize: 8.5,
                                 color: accentColor,
+                                height: 1,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      SizedBox(height: 4),
-                      Text(
-                        'placed $time · ${_ago(order.createdAt)}',
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          color: PosColors.muted,
-                        ),
-                      ),
-                      SizedBox(height: 12),
-                      ...order.items
-                          .take(4)
-                          .map(
-                            (item) => Padding(
-                              padding: EdgeInsets.symmetric(vertical: 2.2),
-                              child: Row(
-                                children: [
-                                  SizedBox(
-                                    width: 24,
-                                    child: Text(
-                                      '×${item.qty}',
-                                      style: TextStyle(
-                                        color: PosColors.muted,
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 9.5,
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      item.name,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 10.5,
-                                        color: PosColors.slate,
-                                      ),
-                                    ),
-                                  ),
-                                  Text(
-                                    currency.format(item.lineTotal),
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 9.5,
-                                      color: PosColors.muted,
-                                    ),
-                                  ),
-                                ],
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          if (table.isNotEmpty) ...[
+                            Icon(
+                              Icons.table_restaurant_outlined,
+                              size: 13,
+                              color: PosColors.muted,
+                            ),
+                            SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                'Table $table',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: _metaStyle(),
                               ),
                             ),
+                            SizedBox(width: 8),
+                          ],
+                          Icon(
+                            Icons.schedule_rounded,
+                            size: 13,
+                            color: PosColors.muted,
                           ),
-                      if (order.items.length > 4)
-                        Padding(
-                          padding: EdgeInsets.only(top: 2),
-                          child: Text(
-                            '+${order.items.length - 4} more',
-                            style: TextStyle(
-                              color: PosColors.muted,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
+                          SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              '$time · ${_ago(order.createdAt)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: _metaStyle(),
                             ),
                           ),
+                        ],
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        summary,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: PosColors.slate,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          height: 1.18,
                         ),
-                      SizedBox(height: 13),
+                      ),
+                      if ((order.note ?? '').trim().isNotEmpty) ...[
+                        SizedBox(height: 5),
+                        Text(
+                          order.note!.trim(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: PosColors.muted,
+                            fontStyle: FontStyle.italic,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                      Spacer(),
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 'TOTAL',
                                 style: TextStyle(
                                   color: PosColors.muted,
-                                  fontSize: 8,
+                                  fontSize: 8.5,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 0.7,
+                                  height: 1,
                                 ),
                               ),
-                              SizedBox(height: 2),
+                              SizedBox(height: 4),
                               Text(
                                 currency.format(order.total),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
-                                  fontSize: 16,
+                                  fontSize: 17,
                                   color: PosColors.slate,
                                   letterSpacing: 0,
+                                  height: 1,
                                 ),
                               ),
                             ],
                           ),
-                          if ((order.note ?? '').isNotEmpty)
-                            Flexible(
-                              child: Text(
-                                order.note!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: PosColors.muted,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                            ),
                           Spacer(),
-                          if (nextStatus != null)
+                          _PrintButton(onTap: onPrint),
+                          if (nextStatus != null) ...[
+                            SizedBox(width: 8),
                             _AdvanceButton(
-                              label: nextLabel!,
+                              label: 'Accept',
                               color: PosColors.primary,
                               onTap: () => onStatus(nextStatus),
-                            )
-                          else
-                            IconButton(
-                              tooltip: 'Print ticket',
-                              onPressed: onPrint,
-                              icon: Icon(
-                                Icons.print_outlined,
-                                color: PosColors.muted,
-                                size: 18,
-                              ),
-                              visualDensity: VisualDensity.compact,
                             ),
+                          ],
                         ],
                       ),
                     ],
@@ -754,6 +683,62 @@ class _OrderCard extends StatelessWidget {
     final hours = (minutes / 60).floor();
     return '$hours hr';
   }
+
+  String? _imageUrlFor(String menuItemId) {
+    for (final item in menuItems) {
+      if (item.id == menuItemId) return item.imageUrl;
+    }
+    return null;
+  }
+
+  String? _primaryImageUrl() {
+    if (order.items.isEmpty) return null;
+    return _imageUrlFor(order.items.first.menuItemId);
+  }
+
+  String _itemsSummary() {
+    if (order.items.isEmpty) return 'No items';
+    final visible = order.items
+        .take(3)
+        .map((item) => '${item.qty}x ${item.name}');
+    final rest = order.items.length - 3;
+    return [...visible, if (rest > 0) '+$rest more'].join(' · ');
+  }
+
+  TextStyle _metaStyle() {
+    return TextStyle(
+      color: PosColors.muted,
+      fontSize: 10.2,
+      fontWeight: FontWeight.w800,
+      height: 1,
+    );
+  }
+}
+
+class _PrintButton extends StatelessWidget {
+  const _PrintButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Print ticket',
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: Material(
+          color: PosColors.surfaceWarm,
+          borderRadius: BorderRadius.circular(10),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Icon(Icons.print_outlined, size: 17, color: PosColors.slate),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _AdvanceButton extends StatelessWidget {
@@ -761,31 +746,29 @@ class _AdvanceButton extends StatelessWidget {
     required this.label,
     required this.color,
     required this.onTap,
-    this.compact = false,
   });
 
   final String label;
   final Color color;
   final VoidCallback onTap;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: compact ? 30 : 38,
-        padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 18),
+        height: 38,
+        padding: EdgeInsets.symmetric(horizontal: 18),
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(compact ? 9 : 11),
+          borderRadius: BorderRadius.circular(11),
         ),
         child: Center(
           child: Text(
             label,
             style: TextStyle(
               fontWeight: FontWeight.w900,
-              fontSize: compact ? 10 : 11,
+              fontSize: 11,
               color: color.computeLuminance() > 0.4
                   ? PosColors.slate
                   : Colors.white,

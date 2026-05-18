@@ -285,32 +285,31 @@ class _MenuList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CompactSurface(
-      padding: EdgeInsets.zero,
-      radius: 10,
-      child: ListView.separated(
-        itemCount: items.length,
-        shrinkWrap: true,
-        physics: NeverScrollableScrollPhysics(),
-        separatorBuilder: (_, _) =>
-            Divider(height: 1, color: PosColors.lineStrong),
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return _MenuRow(
-            item: item,
-            onEdit: () => onEdit(item),
-            onDelete: () => onDelete(item),
-            onAvailabilityChanged: (value) =>
-                onAvailabilityChanged(item, value),
-          );
-        },
+    return GridView.builder(
+      itemCount: items.length,
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 0.62,
       ),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return _MenuTile(
+          item: item,
+          onEdit: () => onEdit(item),
+          onDelete: () => onDelete(item),
+          onAvailabilityChanged: (value) => onAvailabilityChanged(item, value),
+        );
+      },
     );
   }
 }
 
-class _MenuRow extends StatelessWidget {
-  const _MenuRow({
+class _MenuTile extends StatelessWidget {
+  const _MenuTile({
     required this.item,
     required this.onEdit,
     required this.onDelete,
@@ -328,107 +327,160 @@ class _MenuRow extends StatelessWidget {
       symbol: '৳',
       decimalDigits: item.price == item.price.roundToDouble() ? 0 : 2,
     );
-    final initials = item.name
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
-        .take(2)
-        .map((part) => part[0].toUpperCase())
-        .join();
-    final color = _swatchFor(item.name);
+    final statusColor = item.isAvailable ? PosColors.success : PosColors.danger;
 
     return Material(
-      color: Colors.transparent,
+      color: PosColors.surface,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onEdit,
         onLongPress: onDelete,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(10, 9, 8, 9),
-          child: Row(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(color: PosColors.lineStrong),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  initials.isEmpty ? '?' : initials,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                flex: 7,
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Text(
-                      item.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: PosColors.slate,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        height: 1.1,
+                    ColorFiltered(
+                      colorFilter: ColorFilter.mode(
+                        item.isAvailable
+                            ? Colors.transparent
+                            : Colors.black.withValues(alpha: 0.24),
+                        BlendMode.darken,
+                      ),
+                      child: MenuImageView(imageUrl: item.imageUrl),
+                    ),
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.10),
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.30),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                    SizedBox(height: 3),
-                    Text(
-                      '${item.category} · ${item.description}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: PosColors.muted,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w700,
+                    Positioned(
+                      left: 8,
+                      top: 8,
+                      child: _MenuStatusPill(
+                        label: item.isAvailable ? 'Available' : 'Paused',
+                        color: statusColor,
                       ),
                     ),
-                    SizedBox(height: 3),
-                    Text(
-                      item.isAvailable ? 'Available' : 'Paused',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: item.isAvailable
-                            ? PosColors.success
-                            : PosColors.danger,
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w900,
+                    Positioned(
+                      right: 7,
+                      top: 7,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _ImageAction(
+                            icon: Icons.edit_outlined,
+                            tooltip: 'Edit item',
+                            onTap: onEdit,
+                          ),
+                          SizedBox(width: 5),
+                          _ImageAction(
+                            icon: Icons.delete_outline,
+                            tooltip: 'Delete item',
+                            onTap: onDelete,
+                            danger: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      right: 8,
+                      bottom: 8,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: PosColors.primary,
+                          borderRadius: BorderRadius.circular(PosRadii.pill),
+                          border: Border.all(color: PosColors.primaryDark),
+                        ),
+                        child: Text(
+                          currency.format(item.price),
+                          style: TextStyle(
+                            color: PosColors.primaryDark,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w900,
+                            height: 1,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    currency.format(item.price),
-                    style: TextStyle(
-                      color: PosColors.slate,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
-                    ),
+              Expanded(
+                flex: 5,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(10, 9, 9, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: PosColors.slate,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w900,
+                          height: 1.08,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      SizedBox(height: 5),
+                      Text(
+                        item.description.trim().isEmpty
+                            ? item.category
+                            : item.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: PosColors.muted,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        ),
+                      ),
+                      Spacer(),
+                      Row(
+                        children: [
+                          Expanded(child: _CategoryPill(label: item.category)),
+                          SizedBox(width: 6),
+                          Transform.scale(
+                            scale: 0.76,
+                            child: Switch.adaptive(
+                              value: item.isAvailable,
+                              onChanged: onAvailabilityChanged,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 3),
-                  Transform.scale(
-                    scale: 0.76,
-                    alignment: Alignment.centerRight,
-                    child: Switch.adaptive(
-                      value: item.isAvailable,
-                      onChanged: onAvailabilityChanged,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ),
@@ -436,19 +488,100 @@ class _MenuRow extends StatelessWidget {
       ),
     );
   }
+}
 
-  Color _swatchFor(String value) {
-    const colors = [
-      Color(0xFF71413F),
-      Color(0xFF7C504C),
-      Color(0xFF8E5C3C),
-      Color(0xFF356A3D),
-      Color(0xFF0F6558),
-      Color(0xFF7A4A63),
-      Color(0xFF4C5D8D),
-    ];
-    final hash = value.codeUnits.fold<int>(0, (sum, unit) => sum + unit);
-    return colors[hash % colors.length];
+class _MenuStatusPill extends StatelessWidget {
+  const _MenuStatusPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(PosRadii.pill),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.26)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 9,
+          fontWeight: FontWeight.w900,
+          height: 1,
+        ),
+      ),
+    );
+  }
+}
+
+class _ImageAction extends StatelessWidget {
+  const _ImageAction({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.danger = false,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: SizedBox.square(
+        dimension: 30,
+        child: Material(
+          color: Colors.white.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(9),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Icon(
+              icon,
+              size: 15,
+              color: danger ? PosColors.danger : PosColors.primaryDark,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryPill extends StatelessWidget {
+  const _CategoryPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(minHeight: 25),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: PosColors.surfaceWarm,
+        borderRadius: BorderRadius.circular(PosRadii.pill),
+        border: Border.all(color: PosColors.lineStrong),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: PosColors.muted,
+          fontSize: 9.5,
+          fontWeight: FontWeight.w900,
+          height: 1,
+        ),
+      ),
+    );
   }
 }
 
